@@ -1,0 +1,290 @@
+from collections import OrderedDict
+from functools import partial
+import inspect
+import warnings
+
+import numpy as np
+
+import torch
+from torch import nn
+from torch.utils.data import Dataset, TensorDataset
+from torch.autograd import Variable
+from torch.optim.optimizer import Optimizer, required
+
+import torchvision
+import torchvision.transforms as transforms
+
+from BinarisedNeuralNetworks import binarize, BinaryLinear, BinaryConv2d, BinaryTanh
+
+def flatten_dict(d):
+    flat_dict = {}
+    for k, v in d.items():
+        if isinstance(v, dict):
+            flat_d = flatten_dict(v)
+            for k2, v2 in flat_d.items():
+                flat_dict[k + "_" + k2] = v2
+        else:
+            flat_dict[k] = v
+    return flat_dict
+
+def replace_objects(d):
+    d = d.copy()
+    for k, v in d.items():
+        if isinstance(v, dict):
+            d[k] = replace_objects(v)
+        elif isinstance(v, partial):
+            d[k] = v.func.__name__ + "_" + "_".join([str(arg) for arg in v.args])
+        elif callable(v) or inspect.isclass(v):
+            try:
+                d[k] = v.__name__
+            except Exception as e:
+                d[k] = str(v) #.__name__
+    return d
+
+def dict_to_str(d):
+    return str(replace_objects(d)).replace(":","=").replace(",","_").replace("\"","").replace("\'","").replace("{","").replace("}","").replace(" ", "")
+
+def store_model(model, path, dim, verbose = False):
+    dummy_input = torch.randn((1,*dim), device="cuda")
+
+    class Sign(nn.Module):
+        def __init__(self):
+            super(Sign, self).__init__()
+
+        def forward(self, input):
+            return torch.where(input > 0, torch.tensor([1.0]).cuda(), torch.tensor([-1.0]).cuda())
+
+    new_modules = OrderedDict()
+    for m_name, m in model._modules.items():
+        if isinstance(m, BinaryTanh):
+            new_modules[m_name] = Sign()
+        elif isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d)):
+            new_modules[m_name] = m
+        elif isinstance(m, BinaryLinear):
+            new_modules[m_name] = nn.Linear(m.in_features, m.out_features, hasattr(m, 'bias'))
+            
+            if (hasattr(m, 'bias')):
+                new_modules[m_name].weight.bias = binarize(m.bias).data
+            new_modules[m_name].weight.data = binarize(m.weight).data
+        elif isinstance(m, BinaryConv2d):
+            new_modules[m_name] = nn.Conv2d(m.in_channels, m.out_channels, m.kernel_size, m.stride, m.padding, m.dilation, m.groups, hasattr(m, 'bias'), m.padding_mode)
+            if (hasattr(m, 'bias')):
+                new_modules[m_name].weight.bias = binarize(m.bias).data
+            new_modules[m_name].weight.data = binarize(m.weight).data
+        else:
+            new_modules[m_name] = m
+    
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        torch.onnx.export(nn.Sequential(new_modules).cuda(), dummy_input, path, verbose=verbose, input_names=["input"], output_names=["output"])
+    
+    # dummy_model = template.cuda()
+
+    # new_modules = OrderedDict()
+    # for k1,k2 in zip(dummy_model._modules,  model._modules):
+    #     m1 = dummy_model._modules[k1]
+    #     m2 = model._modules[k2]
+    #     #print("MATCHING: ", m1, " - ", m2)
+    #     if isinstance(m2, BinaryTanh):
+    #         #print("Replacing ", m1 , " with BinaryTanH()")
+    #         new_modules[k1] = Sign()
+    #     elif isinstance(m1, (nn.BatchNorm1d, nn.BatchNorm2d)):
+    #         new_modules[k1] = m2
+    #     else:
+    #         new_modules[k1] = m1
+    # dummy_model._modules = new_modules
+    
+    # #print("----")
+    # # Note: ignore scale layer
+    # for m1,m2 in zip(dummy_model._modules.values(), model._modules.values()):
+    #     #print("MATCHING: ", m1, " - ", m2)
+    #     if hasattr(m1, 'weight'):
+    #         if isinstance(m2, (BinaryLinear, BinaryConv2d)): 
+    #             m1.weight.data = binarize(m2.weight).data
+    #         else:
+    #             m1.weight.data = m2.weight.data
+
+    #     if hasattr(m1, 'bias'):
+    #         if isinstance(m2, (BinaryLinear, BinaryConv2d)): 
+    #             m1.bias.data = binarize(m2.bias).data
+    #         else:
+    #             m1.bias.data = m2.bias.data
+    
+    # This code tends to give us warning for the Sign layer that it contains constants such as "0" and "1"
+    # We want to ignore those warnings, since they flood the terminal output 
+    # with warnings.catch_warnings():
+    #     warnings.simplefilter("ignore")
+    #     torch.onnx.export(dummy_model, dummy_input, path, verbose=verbose, input_names=["input"], output_names=["output"])
+
+# See: https://github.com/pytorch/pytorch/issues/19037
+def cov(x, rowvar=False, bias=False, ddof=None, aweights=None):
+    """Estimates covariance matrix like numpy.cov"""
+    # ensure at least 2D
+    if x.dim() == 1:
+        x = x.view(-1, 1)
+
+    # treat each column as a data point, each row as a variable
+    if rowvar and x.shape[0] != 1:
+        x = x.t()
+
+    if ddof is None:
+        if bias == 0:
+            ddof = 1
+        else:
+            ddof = 0
+
+    w = aweights
+    if w is not None:
+        if not torch.is_tensor(w):
+            w = torch.tensor(w, dtype=torch.float)
+        w_sum = torch.sum(w)
+        avg = torch.sum(x * (w/w_sum)[:,None], 0)
+    else:
+        avg = torch.mean(x, 0)
+
+    # Determine the normalization
+    if w is None:
+        fact = x.shape[0] - ddof
+    elif ddof == 0:
+        fact = w_sum
+    elif aweights is None:
+        fact = w_sum - ddof
+    else:
+        fact = w_sum - ddof * torch.sum(w * w) / w_sum
+
+    xm = x.sub(avg.expand_as(x))
+
+    if w is None:
+        X_T = xm.t()
+    else:
+        X_T = torch.mm(torch.diag(w), xm).t()
+
+    c = torch.mm(X_T, xm)
+    c = c / fact
+    return c.squeeze()
+
+def is_same_func(f1,f2):
+    if isinstance(f1, partial) and isinstance(f2, partial):
+        return f1.func == f2.func and f1.args == f2.args and f1.keywords == f2.keywords
+    elif isinstance(f1, partial):
+        return f1.func == f2
+    elif isinstance(f1, partial):
+        return f2.func == f1
+    else:
+        return f1 == f2
+
+# COMMON LOSS FUNCTION
+def weighted_exp_loss(prediction, target, weights = None):
+    prediction = prediction.type(torch.cuda.FloatTensor)
+    num_classes = prediction.shape[1]
+    target_one_hot = 2*torch.nn.functional.one_hot(target, num_classes = n_classes).type(torch.cuda.FloatTensor) - 1.0
+    inner = target_one_hot*prediction
+    return  torch.exp(-inner)
+
+def weighted_squared_hinge_loss(prediction, target, weights = None):
+    #torch.autograd.set_detect_anomaly(True)
+    prediction = prediction.type(torch.cuda.FloatTensor)
+    num_classes = prediction.shape[1]
+    target_one_hot = 2*torch.nn.functional.one_hot(target, num_classes = num_classes).type(torch.cuda.FloatTensor) - 1.0
+    inner = target_one_hot*prediction
+    # Copy to prevent modified inplace error
+    tmp = torch.zeros_like(inner)
+    c1 = inner <= 0
+    # "simulate" the "and" operations with "*" here
+    c2 = (0 < inner) * (inner < 1)
+    #c3 = inner >= 1
+    tmp[c1] = 0.5-inner[c1]
+    tmp[c2] = 0.5*(1-inner[c2])**2
+    tmp = tmp.sum(axis=1)
+    #tmp[c3] = 0
+
+    if weights is None:
+        return tmp
+    else:
+        return weights*tmp
+
+def weighted_mse_loss(prediction, target, weights = None):
+    criterion = nn.MSELoss(reduction="none")
+    num_classes = prediction.shape[1]
+    target_one_hot = torch.nn.functional.one_hot(target, num_classes = num_classes).type(torch.cuda.FloatTensor)
+
+    unweighted_loss = criterion(prediction, target_one_hot)
+    if weights is None:
+        return unweighted_loss
+    else:
+        return weights*unweighted_loss
+
+def weighted_cross_entropy(prediction, target, weights = None):
+    criterion = nn.CrossEntropyLoss(reduction="none")
+    unweighted_loss = criterion(prediction, target)
+    if weights is None:
+        return unweighted_loss
+    else:
+        return weights*unweighted_loss
+
+def apply_in_batches(model, X, batch_size = 128):
+    y_pred = None
+    x_tensor = torch.tensor(X)
+    x_tensor = x_tensor.cuda()
+    
+    dataset = torch.utils.data.TensorDataset(x_tensor)
+    train_loader = torch.utils.data.DataLoader(dataset, batch_size = batch_size)
+    for batch in train_loader:
+        data = batch[0].cuda()
+        pred = model(data)
+        pred = pred.cpu().detach().numpy()
+        if y_pred is None:
+            y_pred = pred
+        else:
+            y_pred = np.concatenate( (y_pred, pred), axis=0 )
+    return y_pred
+
+# See: https://stackoverflow.com/questions/55588201/pytorch-transforms-on-tensordataset/55593757
+class TransformTensorDataset(Dataset):
+    """TensorDataset with support of transforms.
+    """
+    def __init__(self, x_tensor, y_tensor, transform=None):
+        self.x = x_tensor
+        self.y = y_tensor
+        self.transform = transform
+
+    def __getitem__(self, index):
+        x = self.x[index]
+        y = self.y[index]
+
+        if self.transform is not None:
+            pil_transformer = torchvision.transforms.ToPILImage()
+            x = pil_transformer(x)
+            x = self.transform(x)
+
+        return x, y
+
+    def __len__(self):
+        return self.x.size(0)
+
+class Clippy(torch.optim.Adam):
+    def step(self, closure=None):
+        loss = super(Clippy, self).step(closure=closure)
+        for group in self.param_groups:
+            for p in group['params']:
+                p.data.clamp(-1,1)
+            
+        return loss
+
+# SOME HELPFUL LAYERS
+class Flatten(nn.Module):
+    def __init__(self, *args):
+        super(Flatten, self).__init__()
+        self.shape = args
+
+    def forward(self, x):
+        return x.flatten(1)
+        #return x.view(x.size(0), -1)
+
+class Scale(nn.Module):
+    def __init__(self, init_value=1e-3):
+        super().__init__()
+        self.scale = nn.Parameter(torch.FloatTensor([init_value]))
+
+    def forward(self, input):
+        return input * self.scale
