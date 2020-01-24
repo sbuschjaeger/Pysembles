@@ -14,8 +14,6 @@ from torch.optim.optimizer import Optimizer, required
 import torchvision
 import torchvision.transforms as transforms
 
-from BinarisedNeuralNetworks import binarize, BinaryLinear, BinaryConv2d, BinaryTanh
-
 def flatten_dict(d):
     flat_dict = {}
     for k, v in d.items():
@@ -44,77 +42,39 @@ def replace_objects(d):
 def dict_to_str(d):
     return str(replace_objects(d)).replace(":","=").replace(",","_").replace("\"","").replace("\'","").replace("{","").replace("}","").replace(" ", "")
 
-def store_model(model, path, dim, verbose = False):
-    dummy_input = torch.randn((1,*dim), device="cuda")
+# def store_model(model, path, dim, verbose = False):
+#     dummy_input = torch.randn((1,*dim), device="cuda")
 
-    class Sign(nn.Module):
-        def __init__(self):
-            super(Sign, self).__init__()
+#     class Sign(nn.Module):
+#         def __init__(self):
+#             super(Sign, self).__init__()
 
-        def forward(self, input):
-            return torch.where(input > 0, torch.tensor([1.0]).cuda(), torch.tensor([-1.0]).cuda())
+#         def forward(self, input):
+#             return torch.where(input > 0, torch.tensor([1.0]).cuda(), torch.tensor([-1.0]).cuda())
 
-    new_modules = OrderedDict()
-    for m_name, m in model._modules.items():
-        if isinstance(m, BinaryTanh):
-            new_modules[m_name] = Sign()
-        elif isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d)):
-            new_modules[m_name] = m
-        elif isinstance(m, BinaryLinear):
-            new_modules[m_name] = nn.Linear(m.in_features, m.out_features, hasattr(m, 'bias'))
+#     new_modules = OrderedDict()
+#     for m_name, m in model._modules.items():
+#         if isinstance(m, BinaryTanh):
+#             new_modules[m_name] = Sign()
+#         elif isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d)):
+#             new_modules[m_name] = m
+#         elif isinstance(m, BinaryLinear):
+#             new_modules[m_name] = nn.Linear(m.in_features, m.out_features, hasattr(m, 'bias'))
             
-            if (hasattr(m, 'bias')):
-                new_modules[m_name].weight.bias = binarize(m.bias).data
-            new_modules[m_name].weight.data = binarize(m.weight).data
-        elif isinstance(m, BinaryConv2d):
-            new_modules[m_name] = nn.Conv2d(m.in_channels, m.out_channels, m.kernel_size, m.stride, m.padding, m.dilation, m.groups, hasattr(m, 'bias'), m.padding_mode)
-            if (hasattr(m, 'bias')):
-                new_modules[m_name].weight.bias = binarize(m.bias).data
-            new_modules[m_name].weight.data = binarize(m.weight).data
-        else:
-            new_modules[m_name] = m
+#             if (hasattr(m, 'bias')):
+#                 new_modules[m_name].weight.bias = binarize(m.bias).data
+#             new_modules[m_name].weight.data = binarize(m.weight).data
+#         elif isinstance(m, BinaryConv2d):
+#             new_modules[m_name] = nn.Conv2d(m.in_channels, m.out_channels, m.kernel_size, m.stride, m.padding, m.dilation, m.groups, hasattr(m, 'bias'), m.padding_mode)
+#             if (hasattr(m, 'bias')):
+#                 new_modules[m_name].weight.bias = binarize(m.bias).data
+#             new_modules[m_name].weight.data = binarize(m.weight).data
+#         else:
+#             new_modules[m_name] = m
     
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        torch.onnx.export(nn.Sequential(new_modules).cuda(), dummy_input, path, verbose=verbose, input_names=["input"], output_names=["output"])
-    
-    # dummy_model = template.cuda()
-
-    # new_modules = OrderedDict()
-    # for k1,k2 in zip(dummy_model._modules,  model._modules):
-    #     m1 = dummy_model._modules[k1]
-    #     m2 = model._modules[k2]
-    #     #print("MATCHING: ", m1, " - ", m2)
-    #     if isinstance(m2, BinaryTanh):
-    #         #print("Replacing ", m1 , " with BinaryTanH()")
-    #         new_modules[k1] = Sign()
-    #     elif isinstance(m1, (nn.BatchNorm1d, nn.BatchNorm2d)):
-    #         new_modules[k1] = m2
-    #     else:
-    #         new_modules[k1] = m1
-    # dummy_model._modules = new_modules
-    
-    # #print("----")
-    # # Note: ignore scale layer
-    # for m1,m2 in zip(dummy_model._modules.values(), model._modules.values()):
-    #     #print("MATCHING: ", m1, " - ", m2)
-    #     if hasattr(m1, 'weight'):
-    #         if isinstance(m2, (BinaryLinear, BinaryConv2d)): 
-    #             m1.weight.data = binarize(m2.weight).data
-    #         else:
-    #             m1.weight.data = m2.weight.data
-
-    #     if hasattr(m1, 'bias'):
-    #         if isinstance(m2, (BinaryLinear, BinaryConv2d)): 
-    #             m1.bias.data = binarize(m2.bias).data
-    #         else:
-    #             m1.bias.data = m2.bias.data
-    
-    # This code tends to give us warning for the Sign layer that it contains constants such as "0" and "1"
-    # We want to ignore those warnings, since they flood the terminal output 
-    # with warnings.catch_warnings():
-    #     warnings.simplefilter("ignore")
-    #     torch.onnx.export(dummy_model, dummy_input, path, verbose=verbose, input_names=["input"], output_names=["output"])
+#     with warnings.catch_warnings():
+#         warnings.simplefilter("ignore")
+#         torch.onnx.export(nn.Sequential(new_modules).cuda(), dummy_input, path, verbose=verbose, input_names=["input"], output_names=["output"])
 
 # See: https://github.com/pytorch/pytorch/issues/19037
 def cov(x, rowvar=False, bias=False, ddof=None, aweights=None):
@@ -177,7 +137,7 @@ def is_same_func(f1,f2):
 def weighted_exp_loss(prediction, target, weights = None):
     prediction = prediction.type(torch.cuda.FloatTensor)
     num_classes = prediction.shape[1]
-    target_one_hot = 2*torch.nn.functional.one_hot(target, num_classes = n_classes).type(torch.cuda.FloatTensor) - 1.0
+    target_one_hot = 2*torch.nn.functional.one_hot(target, num_classes = num_classes).type(torch.cuda.FloatTensor) - 1.0
     inner = target_one_hot*prediction
     return  torch.exp(-inner)
 
