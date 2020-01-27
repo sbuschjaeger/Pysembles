@@ -19,11 +19,10 @@ from sklearn.metrics import accuracy_score
 from Models import SKEnsemble
 from Utils import apply_in_batches, cov, weighted_mse_loss, weighted_squared_hinge_loss
 
-class NNEnsemble(SKEnsemble):
-    def __init__(self, n_estimators = 5, regularizer = None, *args, **kwargs):
+class SGDEnsembleClassifier(SKEnsemble):
+    def __init__(self, n_estimators = 5, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.n_estimators = n_estimators
-        self.regularizer = regularizer
 
     def fit(self, X, y):
         self.classes_ = unique_labels(y)
@@ -59,15 +58,14 @@ class NNEnsemble(SKEnsemble):
         if self.out_path is not None:
             outfile = open(self.out_path + "/training.csv", "w", 1)
             if self.x_test is not None:
-                o_str = "epoch,loss,train-accuracy,reg,avg-train-accuracy,test-accuracy,avg-test-accuracy"
+                o_str = "epoch,loss,train-accuracy,avg-train-accuracy,test-accuracy,avg-test-accuracy"
             else:
-                o_str = "epoch,loss,train-accuracy,reg,avg-train-accuracy"
+                o_str = "epoch,loss,train-accuracy,avg-train-accuracy"
             outfile.write(o_str + "\n")
         
         self.train()
         for epoch in range(self.epochs):
             total_loss = 0
-            total_reg = 0
             n_correct = 0
             avg_n_correct = 0
             example_cnt = 0
@@ -96,76 +94,17 @@ class NNEnsemble(SKEnsemble):
                     example_cnt += data.shape[0]
                     batch_cnt += 1
 
-                    if self.regularizer is not None and not "reg_type" in self.regularizer:
-                        base_preds = torch.stack(base_preds, dim=1)
-                        B = base_preds.shape[0]
-                        T = base_preds.shape[1]
-                        K = base_preds.shape[2]
-                        base_preds = torch.reshape(base_preds, (B, T*K))
-                        c = cov(base_preds, bias=True, rowvar=False)
-
-                        if self.loss_function == weighted_mse_loss or self.loss_function == nn.MSELoss:
-                            idx_mat = torch.eye(K).cuda()
-                            idx_mat = idx_mat.repeat(B,T,T)
-                            D = 1.0/(self.n_classes_*T**2)*idx_mat
-                        elif self.loss_function == weighted_squared_hinge_loss:
-                            #f_bar = prediction.type(torch.cuda.FloatTensor)
-                            target_one_hot = 2*torch.nn.functional.one_hot(target, num_classes = self.n_classes_).type(torch.cuda.FloatTensor) - 1.0
-                            active = target_one_hot*f_bar
-                            c1 = active < 0
-                            c2 = active > 1
-                            c3 = (0 < active) * (active < 1)
-                            active[c1] = 0
-                            active[c2] = 0
-                            active[c3] = 1
-                            # print(active.shape)
-                            active = active.repeat(1,T).repeat(T*K,1,1).view(B,T*K,T*K)
-                            # print(active.shape)
-                            idx_mat = torch.eye(K).cuda()
-                            idx_mat = idx_mat.repeat(B,T,T)
-                            # print(idx_mat.shape)
-                            # asdf
-                            D = 1.0/(self.n_classes_*T**2)*idx_mat*active
-                        else: #if self.regularizer["type"] == "exact":
-                            def L_beta(h):
-                                # TODO ENFORCE REDUCTION = NONE  IN LOSS
-                                f_beta = h.view((B, T, K)).mean(dim=1)
-                                tmp_loss = self.loss_function(f_beta, target)
-                                return tmp_loss.mean()
-                            
-                            tmp_loss = L_beta(base_preds)
-                            first_deriv = grad(tmp_loss, base_preds, create_graph=True)[0]
-                            first_deriv = K*B*first_deriv.sum(dim=0) # TODO CHECK THIS
-                            D = []
-                            for di in first_deriv:
-                                hessian = grad(di, base_preds, create_graph=False, retain_graph=True)[0]
-                                D.append(hessian)
-                            D = torch.stack(D, dim=1).mean(dim=0)
-                            regularizer = 1.0/2.0*(D*c).sum()
-                        # else:
-                        #     D = torch.ones_like(c)
-                        regularizer = 1.0/2.0*(D.detach()*c).sum()
-                        l_reg = self.regularizer["lambda"]
-                    elif self.regularizer is not None and "reg_type" in self.regularizer:
-                        regularizer = 100. * avg_n_correct/(self.n_estimators*example_cnt)
-                        l_reg = self.regularizer["lambda"]
-                    else:
-                        regularizer = torch.tensor(0)
-                        l_reg = 0
-
-                    total_reg += regularizer
-                    loss = loss.mean() + l_reg * regularizer
+                    loss = loss.mean() 
 
                     loss.backward()
                     optimizer.step()
 
-                    desc = "[{}/{}] loss {:4.3f} acc {:4.2f} avg acc {:4.2f} reg {:10.8f}".format(
+                    desc = "[{}/{}] loss {:4.3f} acc {:4.2f} avg acc {:4.2f}".format(
                         epoch, 
                         self.epochs-1, 
                         total_loss/example_cnt, 
                         100. * n_correct/example_cnt,
-                        100. * avg_n_correct/(self.n_estimators*example_cnt),
-                        total_reg/batch_cnt
+                        100. * avg_n_correct/(self.n_estimators*example_cnt)
                     )
 
                     pbar.set_description(desc)
@@ -183,13 +122,12 @@ class NNEnsemble(SKEnsemble):
                         e_acc = accuracy_score(np.argmax(e_output, axis=1),self.y_test)*100.0
                         all_accuracy_test.append(e_acc)
 
-                    desc = "[{}/{}] loss {:4.3f} acc {:4.2f} avg acc {:4.2f} reg {:10.8f} test acc {:4.3f} avg test acc {:4.3f}, test acc proba {:4.3f}".format(
+                    desc = "[{}/{}] loss {:4.3f} acc {:4.2f} avg acc {:4.2f} test acc {:4.3f} avg test acc {:4.3f}, test acc proba {:4.3f}".format(
                         epoch, 
                         self.epochs-1, 
                         total_loss/example_cnt, 
                         100. * n_correct/example_cnt,
                         100. * avg_n_correct/(self.n_estimators*example_cnt),
-                        total_reg/batch_cnt,
                         accuracy_test_apply,
                         np.mean(all_accuracy_test), 
                         accuracy_test_proba
@@ -213,21 +151,19 @@ class NNEnsemble(SKEnsemble):
                         e_acc = accuracy_score(np.argmax(e_output, axis=1),self.y_test)*100.0
                         all_accuracy_test.append(e_acc)
 
-                    o_str = "{},{},{},{},{},{},{}\n".format(
+                    o_str = "{},{},{},{},{},{}\n".format(
                         epoch, 
                         total_loss/example_cnt, 
                         100.0 * n_correct/example_cnt, 
-                        total_reg/batch_cnt,
                         100. * avg_n_correct/(self.n_estimators*example_cnt),
                         accuracy_test,
                         np.mean(all_accuracy_test)
                     )
                 else:
-                    o_str = "{},{},{},{},{}\n".format(
+                    o_str = "{},{},{},{}\n".format(
                         epoch, 
                         total_loss/example_cnt, 
                         100.0 * n_correct/example_cnt, 
-                        total_reg/batch_cnt,
                         100. * avg_n_correct/(self.n_estimators*example_cnt)
                     )
                 outfile.write(o_str)
