@@ -1,6 +1,6 @@
 import os
 import random
-
+import copy
 import torch
 from torch import nn
 from torch.autograd import Variable
@@ -16,31 +16,39 @@ from Utils import apply_in_batches
 
 class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
     def __init__(self, optimizer, scheduler, loss_function, 
-                 base_estimator = None, # TODO THIS SHOULD NE BE HARDCODED HERE, SHOULD IT?
+                 base_estimator, 
                  transformer = None,
                  seed = None,
                  verbose = True, out_path = None, 
                  x_test = None, y_test = None) :
         super().__init__()
         
-        self.batch_size = optimizer.pop("batch_size")
-        self.epochs = optimizer.pop("epochs")
-        self.optimizer_method = optimizer.pop("method")
-        
-        if scheduler is not None:
-            self.scheduler_method = scheduler.pop("method")
+        if optimizer is not None:
+            optimizer_copy = copy.deepcopy(optimizer)
+            self.batch_size = optimizer_copy.pop("batch_size")
+            self.epochs = optimizer_copy.pop("epochs")
+            self.optimizer_method = optimizer_copy.pop("method")
+            self.optimizer = optimizer_copy
         else:
-            self.scheduler_method = None
+            self.optimizer = None
 
-        self.scheduler = scheduler
+        if scheduler is not None:
+            scheduler_copy = copy.deepcopy(scheduler)
+
+            self.scheduler_method = scheduler_copy.pop("method")
+            self.scheduler = scheduler_copy
+
+        else:
+            self.scheduler = None
+            
         self.base_estimator = base_estimator
-        self.optimizer = optimizer
         self.loss_function = loss_function
         self.transformer = transformer
         self.verbose = verbose
         self.out_path = out_path
         self.x_test = x_test
         self.y_test = y_test
+        self.seed = seed
 
         if seed is not None:
             np.random.seed(seed)
@@ -177,7 +185,7 @@ class SKLearnModel(SKLearnBaseModel):
                         epoch_loss += loss.sum().item()
                         loss = loss.mean()
                         n_correct += unweighted_acc.sum().item()
-
+                    
                     loss.backward()
                     optimizer.step()
 
