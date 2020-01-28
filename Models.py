@@ -106,6 +106,10 @@ class StagedEnsemble(SKEnsemble):
                 yield all_pred*self.n_estimators/(i+1)
 
 class SKLearnModel(SKLearnBaseModel):
+    def __init__(self, training_csv = "training.csv", *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.training_csv = training_csv
+
     def fit(self, X, y, sample_weight = None):
         self.classes_ = unique_labels(y)
         self.n_classes_ = len(self.classes_)
@@ -146,7 +150,7 @@ class SKLearnModel(SKLearnBaseModel):
         self.train()
         if self.out_path is not None:
             #file_cnt = sum([1 if "training" in fname else 0 for fname in os.listdir(self.out_path)])
-            outfile = open(self.out_path + "/training.csv", "w", 1)
+            outfile = open(self.out_path + "/" + self.training_csv, "w", 1)
             if self.x_test is not None:
                 o_str = "epoch,loss,train-accuracy,test-accuracy"
             else:

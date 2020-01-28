@@ -26,7 +26,7 @@ class BaggingClassifier(StagedEnsemble):
         self.y_ = y
 
         self.estimators_ = nn.ModuleList([
-            SKLearnModel(*self.args, **self.kwargs) for i in range(self.n_estimators)
+            SKLearnModel(training_csv="training_{}.csv".format(i), *self.args, **self.kwargs) for i in range(self.n_estimators)
         ])
 
         for idx, est in enumerate(self.estimators_):

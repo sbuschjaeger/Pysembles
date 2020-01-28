@@ -17,7 +17,7 @@ from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import accuracy_score
 
 from Models import SKEnsemble
-from Utils import apply_in_batches, cov, weighted_mse_loss, weighted_squared_hinge_loss, is_same_func, weighted_cross_entropy
+from Utils import apply_in_batches, cov, weighted_mse_loss, weighted_squared_hinge_loss, is_same_func, weighted_cross_entropy, weighted_cross_entropy_with_softmax, weighted_lukas_loss
 
 class GNCLClassifier(SKEnsemble):
     def __init__(self, n_estimators = 5, l_reg = 0, *args, **kwargs):
@@ -41,12 +41,6 @@ class GNCLClassifier(SKEnsemble):
 
         optimizer = self.optimizer_method(self.parameters(), **self.optimizer)
         scheduler = self.scheduler_method(optimizer, **self.scheduler)
-
-        # optimizers = [ self.optimizer_method(self.estimators_[i].parameters(), **self.optimizer)  for i in range(self.n_estimators) ]
-        # if self.scheduler_method is not None:
-        #     schedulers = [ self.scheduler_method(optimizers[i], **self.scheduler) for i in range(self.n_estimators) ]
-        # else:
-        #     schedulers = None
 
         cuda_cfg = {'num_workers': 0, 'pin_memory': True} 
         train_loader = torch.utils.data.DataLoader(
@@ -90,9 +84,6 @@ class GNCLClassifier(SKEnsemble):
                     data, target = Variable(data), Variable(target)
 
                     optimizer.zero_grad()
-                    # for opt in optimizers:
-                    #     opt.zero_grad()
-
                     f_bar, base_preds = self.forward_with_base(data)
                     
                     for pred in base_preds:
@@ -114,16 +105,31 @@ class GNCLClassifier(SKEnsemble):
 
                         eye_matrix = torch.eye(n_classes).repeat(n_preds, 1, 1).cuda()
                         D = 2.0*eye_matrix
-                    elif (is_same_func(self.loss_function, weighted_cross_entropy) or is_same_func(self.loss_function, nn.CrossEntropyLoss)):
+                    elif (is_same_func(self.loss_function, weighted_cross_entropy)):
+                        D = torch.eye(n_classes).repeat(n_preds, 1, 1).cuda()
+                        n_classes = pred.shape[1]
+                        n_preds = pred.shape[0]
+                        target_one_hot = torch.nn.functional.one_hot(target, num_classes = num_classes).type(torch.cuda.FloatTensor)
+
+                        eps = 1e-7
+                        diag_vector = target_one_hot*(1.0/(mu**2+eps))
+                        D.diagonal(dim1=-2, dim2=-1).copy_(diag_vector)
+
+                    elif (is_same_func(self.loss_function, weighted_cross_entropy_with_softmax) or is_same_func(self.loss_function, nn.CrossEntropyLoss)):
                         n_preds = pred.shape[0]
                         n_classes = pred.shape[1]
-                        
                         f_bar_softmax = nn.functional.softmax(f_bar,dim=1)
                         D = -1.0*torch.bmm(f_bar_softmax.unsqueeze(2), f_bar_softmax.unsqueeze(1))
                         diag_vector = f_bar_softmax*(1.0-f_bar_softmax)
                         D.diagonal(dim1=-2, dim2=-1).copy_(diag_vector)
-                        # for i in range(n_classes):
-                        #     D[:,i,i] = diag_vector[:,i]
+                    elif (is_same_func(self.loss_function, weighted_lukas_loss)):
+                        # TODO DEBUG IF THIS IS ACTUALLY CORRECT
+                        n_preds = pred.shape[0]
+                        n_classes = pred.shape[1]
+                        D = torch.eye(n_classes).repeat(n_preds, 1, 1).cuda()
+                        target_one_hot = 2*torch.nn.functional.one_hot(target, num_classes = num_classes).type(torch.cuda.FloatTensor) - 1.0
+                        diag_vector = 2/np.sqrt(np.pi)*(torch.exp(-(-target_one_hot*mu)**2))
+                        D.diagonal(dim1=-2, dim2=-1).copy_(diag_vector)
                     else:
                         # TODO Use autodiff do compute second derivative for given loss function
                         D = 1.0
@@ -133,7 +139,7 @@ class GNCLClassifier(SKEnsemble):
                         # TODO MAYBE NOT DETACH THIS
                         diff = pred - f_bar #.detach()
                         covar = torch.bmm(diff.unsqueeze(1), torch.bmm(D, diff.unsqueeze(2))).squeeze()
-                        reg = -0.5 * covar.mean()
+                        reg = 0.5 * covar.mean()
                         diversity += reg.item()
 
                         i_loss = self.loss_function(pred, target)
@@ -141,21 +147,14 @@ class GNCLClassifier(SKEnsemble):
                         ensemble_reg[i] += reg.item()
 
                         i_mean = i_loss.mean()
-                        #reg_loss = -2 * i_mean * self.l_reg * reg 
-                        reg_loss = i_mean + self.l_reg * reg 
-                        
-                        # if reg_loss < 0:
-                        #     reg_loss = i_mean
+                        reg_loss = i_mean - reg
 
                         if sum_losses is not None:
-                            sum_losses += reg_loss
+                            #sum_losses += reg_loss
+                            sum_losses += i_mean + self.l_reg * reg_loss**2
                         else:
-                            sum_losses = reg_loss
-                        # if i == self.n_estimators - 1:
-                        #     reg_loss.backward(retain_graph=False)
-                        # else:
-                        #     reg_loss.backward(retain_graph=True)
-                        #optimizers[i].step()
+                            #sum_losses = reg_loss
+                            sum_losses = i_mean + self.l_reg * reg_loss**2
                     sum_losses.backward()
                     optimizer.step()
 

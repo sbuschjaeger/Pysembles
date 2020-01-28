@@ -175,12 +175,32 @@ def weighted_mse_loss(prediction, target, weights = None):
         return weights*unweighted_loss
 
 def weighted_cross_entropy(prediction, target, weights = None):
+    num_classes = prediction.shape[1]
+    target_one_hot = torch.nn.functional.one_hot(target, num_classes = num_classes).type(torch.cuda.FloatTensor)
+    eps = 1e-7
+    unweighted_loss = -(torch.log(prediction+eps)*target_one_hot).sum(dim=1)
+
+    if weights is None:
+        return unweighted_loss
+    else:
+        return weights*unweighted_loss
+
+def weighted_cross_entropy_with_softmax(prediction, target, weights = None):
     criterion = nn.CrossEntropyLoss(reduction="none")
     unweighted_loss = criterion(prediction, target)
     if weights is None:
         return unweighted_loss
     else:
         return weights*unweighted_loss
+
+def weighted_lukas_loss(prediction, target, weights = None):
+    #1/(E^x^2 Sqrt[Pi]) + x + x Erf[x]
+    #2/(E^x^2 Sqrt[Pi])
+    num_classes = prediction.shape[1]
+    target_one_hot = 2*torch.nn.functional.one_hot(target, num_classes = num_classes).type(torch.cuda.FloatTensor) - 1.0
+
+    z = -prediction * target_one_hot
+    return torch.sum(torch.exp(-z**2) *1.0/np.sqrt(np.pi) + z * (1 + torch.erf(z)),dim=1)
 
 def apply_in_batches(model, X, batch_size = 128):
     y_pred = None
