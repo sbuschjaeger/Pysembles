@@ -127,8 +127,8 @@ class GNCLClassifier(SKEnsemble):
                         n_preds = pred.shape[0]
                         n_classes = pred.shape[1]
                         D = torch.eye(n_classes).repeat(n_preds, 1, 1).cuda()
-                        target_one_hot = 2*torch.nn.functional.one_hot(target, num_classes = num_classes).type(torch.cuda.FloatTensor) - 1.0
-                        diag_vector = 2/np.sqrt(np.pi)*(torch.exp(-(-target_one_hot*mu)**2))
+                        target_one_hot = 2*torch.nn.functional.one_hot(target, num_classes = n_classes).type(torch.cuda.FloatTensor) - 1.0
+                        diag_vector = 2/np.sqrt(np.pi)*(torch.exp(-(-target_one_hot*f_bar)**2))
                         D.diagonal(dim1=-2, dim2=-1).copy_(diag_vector)
                     else:
                         # TODO Use autodiff do compute second derivative for given loss function
@@ -150,20 +150,19 @@ class GNCLClassifier(SKEnsemble):
                         ensemble_reg[i] += reg.item()
 
                         i_mean = i_loss.mean()
-
                         if self.l_mode == "ncl":
-                            loss = i_mean - self.l_reg * reg
+                            reg_loss = i_mean - self.l_reg * reg
                         elif self.l_mode == "min-var":
-                            loss = i_mean + torch.max(0, self.l_reg - reg)
+                            reg_loss = i_mean + torch.clamp(self.l_reg - reg,0)
                         elif self.l_mode == "rhs":
-                            loss = i_mean - self.l_reg * (i_mean - f_loss)
+                            reg_loss = i_mean - self.l_reg * (i_mean - f_loss)
                         else:
-                            loss = i_mean
+                            reg_loss = i_mean
 
                         if sum_losses is not None:
-                            sum_losses += loss
+                            sum_losses += reg_loss
                         else:
-                            sum_losses = loss
+                            sum_losses = reg_loss
 
                         # if reg < self.l_reg:
                         #     reg_loss = -reg
