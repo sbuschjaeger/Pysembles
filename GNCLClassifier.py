@@ -20,11 +20,11 @@ from Models import SKEnsemble
 from Utils import apply_in_batches, cov, weighted_mse_loss, weighted_squared_hinge_loss, is_same_func, weighted_cross_entropy, weighted_cross_entropy_with_softmax, weighted_lukas_loss
 
 class GNCLClassifier(SKEnsemble):
-    def __init__(self, n_estimators = 5, l_reg = 0, *args, **kwargs):
+    def __init__(self, n_estimators = 5, l_reg = 0, l_mode = "ncl", *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.n_estimators = n_estimators
         self.l_reg = l_reg
-        self.l_mode = "ncl"
+        self.l_mode = l_mode
 
     def fit(self, X, y, sample_weight = None):
         self.classes_ = unique_labels(y)
@@ -135,8 +135,8 @@ class GNCLClassifier(SKEnsemble):
                         D = 1.0
 
                     f_loss = self.loss_function(f_bar, target).mean()
-                    sum_losses = f_loss
-                    # sum_losses = None
+                    #sum_losses = f_loss
+                    sum_losses = None
 
                     for i, pred in enumerate(base_preds):
                         # TODO MAYBE NOT DETACH THIS
@@ -156,7 +156,7 @@ class GNCLClassifier(SKEnsemble):
                         elif self.l_mode == "min-var":
                             loss = i_mean + torch.max(0, self.l_reg - reg)
                         elif self.l_mode == "rhs":
-                            loss = i_mean - self.l_reg * f_loss
+                            loss = i_mean - self.l_reg * (i_mean - f_loss)
                         else:
                             loss = i_mean
 
