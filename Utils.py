@@ -261,6 +261,15 @@ class Flatten(nn.Module):
         return x.flatten(1)
         #return x.view(x.size(0), -1)
 
+class Clamp(nn.Module):
+    def __init__(self, min_out = -3, max_out = 3):
+        super().__init__()
+        self.min_out = min_out
+        self.max_out = max_out
+
+    def forward(self, input):
+        return input.clamp(self.min_out, self.max_out)
+
 class Scale(nn.Module):
     def __init__(self, init_value=1e-3):
         super().__init__()

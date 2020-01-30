@@ -24,6 +24,7 @@ class GNCLClassifier(SKEnsemble):
         super().__init__(*args, **kwargs)
         self.n_estimators = n_estimators
         self.l_reg = l_reg
+        self.l_mode = "ncl"
 
     def fit(self, X, y, sample_weight = None):
         self.classes_ = unique_labels(y)
@@ -106,15 +107,14 @@ class GNCLClassifier(SKEnsemble):
                         eye_matrix = torch.eye(n_classes).repeat(n_preds, 1, 1).cuda()
                         D = 2.0*eye_matrix
                     elif (is_same_func(self.loss_function, weighted_cross_entropy)):
-                        D = torch.eye(n_classes).repeat(n_preds, 1, 1).cuda()
                         n_classes = pred.shape[1]
                         n_preds = pred.shape[0]
-                        target_one_hot = torch.nn.functional.one_hot(target, num_classes = num_classes).type(torch.cuda.FloatTensor)
+                        D = torch.eye(n_classes).repeat(n_preds, 1, 1).cuda()
+                        target_one_hot = torch.nn.functional.one_hot(target, num_classes = n_classes).type(torch.cuda.FloatTensor)
 
                         eps = 1e-7
-                        diag_vector = target_one_hot*(1.0/(mu**2+eps))
+                        diag_vector = target_one_hot*(1.0/(f_bar**2+eps))
                         D.diagonal(dim1=-2, dim2=-1).copy_(diag_vector)
-
                     elif (is_same_func(self.loss_function, weighted_cross_entropy_with_softmax) or is_same_func(self.loss_function, nn.CrossEntropyLoss)):
                         n_preds = pred.shape[0]
                         n_classes = pred.shape[1]
@@ -134,7 +134,10 @@ class GNCLClassifier(SKEnsemble):
                         # TODO Use autodiff do compute second derivative for given loss function
                         D = 1.0
 
-                    sum_losses = None
+                    f_loss = self.loss_function(f_bar, target).mean()
+                    sum_losses = f_loss
+                    # sum_losses = None
+
                     for i, pred in enumerate(base_preds):
                         # TODO MAYBE NOT DETACH THIS
                         diff = pred - f_bar #.detach()
@@ -147,14 +150,42 @@ class GNCLClassifier(SKEnsemble):
                         ensemble_reg[i] += reg.item()
 
                         i_mean = i_loss.mean()
-                        reg_loss = i_mean - reg
+
+                        if self.l_mode == "ncl":
+                            loss = i_mean - self.l_reg * reg
+                        elif self.l_mode == "min-var":
+                            loss = i_mean + torch.max(0, self.l_reg - reg)
+                        elif self.l_mode == "rhs":
+                            loss = i_mean - self.l_reg * f_loss
+                        else:
+                            loss = i_mean
 
                         if sum_losses is not None:
-                            #sum_losses += reg_loss
-                            sum_losses += i_mean + self.l_reg * reg_loss**2
+                            sum_losses += loss
                         else:
-                            #sum_losses = reg_loss
-                            sum_losses = i_mean + self.l_reg * reg_loss**2
+                            sum_losses = loss
+
+                        # if reg < self.l_reg:
+                        #     reg_loss = -reg
+                        # else:
+                        #     reg_loss = i_mean 
+
+                        # if sum_losses is not None:
+                        #     sum_losses += reg_loss
+                        # else:
+                        #     sum_losses = reg_loss
+
+                        # reg_loss = i_mean - self.l_reg *reg
+                        # if sum_losses is not None:
+                        #     sum_losses += reg_loss**2
+                        # else:
+                        #     sum_losses = reg_loss**2
+
+                        # reg_loss = i_mean.detach() - reg
+                        # if sum_losses is not None:
+                        #     sum_losses += i_mean + self.l_reg * reg_loss**2
+                        # else:
+                        #     sum_losses = i_mean + self.l_reg * reg_loss**2
                     sum_losses.backward()
                     optimizer.step()
 
