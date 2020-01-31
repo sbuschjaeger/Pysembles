@@ -64,7 +64,7 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
         self.eval()
         self.cuda()
         with torch.no_grad(): 
-            ret_val = apply_in_batches(self, X)
+            ret_val = apply_in_batches(self, X, batch_size = self.batch_size)
             self.train(before_eval)
             return ret_val
 
@@ -96,7 +96,7 @@ class StagedEnsemble(SKEnsemble):
         with torch.no_grad():
             all_pred = None
             for i, est in enumerate(self.estimators_):
-                y_pred = apply_in_batches(est, X)
+                y_pred = apply_in_batches(est, X, batch_size = self.batch_size)
                 
                 if all_pred is None:
                     all_pred = 1.0/self.n_estimators*y_pred
@@ -209,7 +209,7 @@ class SKLearnModel(SKLearnBaseModel):
                     # output = apply_in_batches(self, self.x_test)
                     # accuracy_test = accuracy_score(np.argmax(output, axis=1),self.y_test)*100.0
 
-                    output = apply_in_batches(self, self.x_test)
+                    output = apply_in_batches(self, self.x_test, batch_size = self.batch_size)
                     accuracy_test_apply = accuracy_score(np.argmax(output, axis=1),self.y_test)*100.0
 
                     output_proba = self.predict_proba(self.x_test)
@@ -235,7 +235,7 @@ class SKLearnModel(SKLearnBaseModel):
                 accuracy = 100.0*n_correct/example_cnt
 
                 if self.x_test is not None:
-                    output = apply_in_batches(self, self.x_test)
+                    output = apply_in_batches(self, self.x_test, batch_size = self.batch_size)
                     accuracy_test = accuracy_score(np.argmax(output, axis=1),self.y_test)*100.0
                     outfile.write("{},{},{},{}\n".format(epoch, avg_loss, accuracy, accuracy_test))
                 else:

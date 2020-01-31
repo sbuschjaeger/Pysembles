@@ -110,7 +110,7 @@ class SGDEnsembleClassifier(SKEnsemble):
                     pbar.set_description(desc)
                 
                 if self.x_test is not None:
-                    output = apply_in_batches(self, self.x_test)
+                    output = apply_in_batches(self, self.x_test, batch_size = self.batch_size)
                     accuracy_test_apply = accuracy_score(np.argmax(output, axis=1),self.y_test)*100.0
 
                     output_proba = self.predict_proba(self.x_test)
@@ -118,7 +118,7 @@ class SGDEnsembleClassifier(SKEnsemble):
 
                     all_accuracy_test = []
                     for e in self.estimators_:
-                        e_output = apply_in_batches(e, self.x_test)
+                        e_output = apply_in_batches(e, self.x_test, batch_size = self.batch_size)
                         e_acc = accuracy_score(np.argmax(e_output, axis=1),self.y_test)*100.0
                         all_accuracy_test.append(e_acc)
 
@@ -147,7 +147,7 @@ class SGDEnsembleClassifier(SKEnsemble):
                     accuracy_test = accuracy_score(np.argmax(output, axis=1),self.y_test)*100.0
                     all_accuracy_test = []
                     for e in self.estimators_:
-                        e_output = apply_in_batches(e, self.x_test)
+                        e_output = apply_in_batches(e, self.x_test, batch_size = self.batch_size)
                         e_acc = accuracy_score(np.argmax(e_output, axis=1),self.y_test)*100.0
                         all_accuracy_test.append(e_acc)
 

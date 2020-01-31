@@ -153,7 +153,12 @@ class GNCLClassifier(SKEnsemble):
                         if self.l_mode == "ncl":
                             reg_loss = i_mean - self.l_reg * reg
                         elif self.l_mode == "min-var":
-                            reg_loss = i_mean + torch.clamp(self.l_reg - reg,0)
+                            if reg < self.l_reg:
+                                reg_loss = -2*reg
+                            else:
+                                reg_loss = i_mean
+                            #reg_loss = torch.max(i_mean, torch.clamp(self.l_reg - reg,0))
+                            reg_loss = i_mean + self.l_reg*1/reg #- (self.l_reg - reg)**2
                         elif self.l_mode == "rhs":
                             reg_loss = i_mean - self.l_reg * (i_mean - f_loss)
                         else:
@@ -200,7 +205,7 @@ class GNCLClassifier(SKEnsemble):
                     pbar.set_description(desc)
             
                 if self.x_test is not None:
-                    output = apply_in_batches(self, self.x_test)
+                    output = apply_in_batches(self, self.x_test, batch_size=self.batch_size)
                     accuracy_test = accuracy_score(np.argmax(output, axis=1),self.y_test)*100.0
 
                     all_accuracy_test = []
@@ -238,7 +243,7 @@ class GNCLClassifier(SKEnsemble):
                         e_acc = accuracy_score(np.argmax(e_output, axis=1),self.y_test)*100.0
                         all_accuracy_test.append(e_acc)
 
-                    out_str = "{},{},{},{}".format(
+                    out_str = "{},{},{},{},{},{}".format(
                         epoch, 
                         total_loss/example_cnt, 
                         100.0*n_correct/example_cnt,
