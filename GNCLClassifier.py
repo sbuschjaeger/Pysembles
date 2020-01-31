@@ -157,8 +157,8 @@ class GNCLClassifier(SKEnsemble):
                                 reg_loss = -2*reg
                             else:
                                 reg_loss = i_mean
-                            #reg_loss = torch.max(i_mean, torch.clamp(self.l_reg - reg,0))
-                            reg_loss = i_mean + self.l_reg*1/reg #- (self.l_reg - reg)**2
+                        elif self.l_mode == "inverse-var":
+                            reg_loss = i_mean + self.l_reg*1/reg 
                         elif self.l_mode == "rhs":
                             reg_loss = i_mean - self.l_reg * (i_mean - f_loss)
                         else:
@@ -168,28 +168,6 @@ class GNCLClassifier(SKEnsemble):
                             sum_losses += reg_loss
                         else:
                             sum_losses = reg_loss
-
-                        # if reg < self.l_reg:
-                        #     reg_loss = -reg
-                        # else:
-                        #     reg_loss = i_mean 
-
-                        # if sum_losses is not None:
-                        #     sum_losses += reg_loss
-                        # else:
-                        #     sum_losses = reg_loss
-
-                        # reg_loss = i_mean - self.l_reg *reg
-                        # if sum_losses is not None:
-                        #     sum_losses += reg_loss**2
-                        # else:
-                        #     sum_losses = reg_loss**2
-
-                        # reg_loss = i_mean.detach() - reg
-                        # if sum_losses is not None:
-                        #     sum_losses += i_mean + self.l_reg * reg_loss**2
-                        # else:
-                        #     sum_losses = i_mean + self.l_reg * reg_loss**2
                     sum_losses.backward()
                     optimizer.step()
 
