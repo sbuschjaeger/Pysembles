@@ -67,7 +67,7 @@ class SGDEnsembleClassifier(SKEnsemble):
         for epoch in range(self.epochs):
             total_loss = 0
             n_correct = 0
-            avg_n_correct = 0
+            avg_n_correct = [0 for _ in range(self.n_estimators)]
             example_cnt = 0
             batch_cnt = 0
 
@@ -81,9 +81,10 @@ class SGDEnsembleClassifier(SKEnsemble):
                     optimizer.zero_grad()
                     f_bar, base_preds = self.forward_with_base(data)
                     
-                    for pred in base_preds:
+                    for i, pred in enumerate(base_preds):
                         acc = (pred.argmax(1) == target).type(torch.cuda.FloatTensor)
-                        avg_n_correct += acc.sum().item()
+                        avg_n_correct[i] +=acc.sum().item()
+                        # avg_n_correct += acc.sum().item()
 
                     accuracy = (f_bar.argmax(1) == target).type(torch.cuda.FloatTensor)
                     loss = self.loss_function(f_bar, target)
@@ -99,12 +100,14 @@ class SGDEnsembleClassifier(SKEnsemble):
                     loss.backward()
                     optimizer.step()
 
-                    desc = "[{}/{}] loss {:4.3f} acc {:4.2f} avg acc {:4.2f}".format(
+                    desc = "[{}/{}] loss {:4.3f} acc {:4.2f} avg acc {:4.2f} min {:4.2f} max {:4.2f}".format(
                         epoch, 
                         self.epochs-1, 
                         total_loss/example_cnt, 
                         100. * n_correct/example_cnt,
-                        100. * avg_n_correct/(self.n_estimators*example_cnt)
+                        100. * np.mean(avg_n_correct)/(example_cnt),
+                        100. * min(avg_n_correct)/example_cnt,
+                        100. * max(avg_n_correct)/example_cnt
                     )
 
                     pbar.set_description(desc)
@@ -122,12 +125,14 @@ class SGDEnsembleClassifier(SKEnsemble):
                         e_acc = accuracy_score(np.argmax(e_output, axis=1),self.y_test)*100.0
                         all_accuracy_test.append(e_acc)
 
-                    desc = "[{}/{}] loss {:4.3f} acc {:4.2f} avg acc {:4.2f} test acc {:4.3f} avg test acc {:4.3f}, test acc proba {:4.3f}".format(
+                    desc = "[{}/{}] loss {:4.3f} acc {:4.2f} avg acc {:4.2f} min {:4.2f} max {:4.2f} test acc {:4.3f} avg test acc {:4.3f} test acc proba {:4.3f}".format(
                         epoch, 
                         self.epochs-1, 
                         total_loss/example_cnt, 
                         100. * n_correct/example_cnt,
-                        100. * avg_n_correct/(self.n_estimators*example_cnt),
+                        100. * np.mean(avg_n_correct)/(example_cnt),
+                        100. *min(avg_n_correct)/example_cnt,
+                        100. *max(avg_n_correct)/example_cnt,
                         accuracy_test_apply,
                         np.mean(all_accuracy_test), 
                         accuracy_test_proba
@@ -151,20 +156,24 @@ class SGDEnsembleClassifier(SKEnsemble):
                         e_acc = accuracy_score(np.argmax(e_output, axis=1),self.y_test)*100.0
                         all_accuracy_test.append(e_acc)
 
-                    o_str = "{},{},{},{},{},{}\n".format(
+                    o_str = "{},{},{},{},{},{},{},{}\n".format(
                         epoch, 
                         total_loss/example_cnt, 
                         100.0 * n_correct/example_cnt, 
-                        100. * avg_n_correct/(self.n_estimators*example_cnt),
+                        100. * np.mean(avg_n_correct)/(example_cnt),
+                        100. *min(avg_n_correct)/example_cnt,
+                        100. *max(avg_n_correct)/example_cnt,
                         accuracy_test,
                         np.mean(all_accuracy_test)
                     )
                 else:
-                    o_str = "{},{},{},{}\n".format(
+                    o_str = "{},{},{},{},{},{}\n".format(
                         epoch, 
                         total_loss/example_cnt, 
                         100.0 * n_correct/example_cnt, 
-                        100. * avg_n_correct/(self.n_estimators*example_cnt)
+                        100. * np.mean(avg_n_correct)/(example_cnt),
+                        100. *min(avg_n_correct)/example_cnt,
+                        100. *max(avg_n_correct)/example_cnt,
                     )
                 outfile.write(o_str)
                 if epoch % 10 == 0:

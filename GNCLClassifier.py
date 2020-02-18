@@ -68,7 +68,7 @@ class GNCLClassifier(SKEnsemble):
 
         for epoch in range(self.epochs):
             n_correct = 0
-            avg_n_correct = 0
+            avg_n_correct = [0 for _ in range(self.n_estimators)]
             example_cnt = 0
             batch_cnt = 0
 
@@ -87,9 +87,9 @@ class GNCLClassifier(SKEnsemble):
                     optimizer.zero_grad()
                     f_bar, base_preds = self.forward_with_base(data)
                     
-                    for pred in base_preds:
+                    for i, pred in enumerate(base_preds):
                         acc = (pred.argmax(1) == target).type(torch.cuda.FloatTensor)
-                        avg_n_correct += acc.sum().item()
+                        avg_n_correct[i] += acc.sum().item()
 
                     accuracy = (f_bar.argmax(1) == target).type(torch.cuda.FloatTensor)
                     loss = self.loss_function(f_bar, target)
@@ -140,7 +140,7 @@ class GNCLClassifier(SKEnsemble):
 
                     for i, pred in enumerate(base_preds):
                         # TODO MAYBE NOT DETACH THIS
-                        diff = pred - f_bar #.detach()
+                        diff = pred - f_bar.detach() #.detach()
                         covar = torch.bmm(diff.unsqueeze(1), torch.bmm(D, diff.unsqueeze(2))).squeeze()
                         reg = 0.5 * covar.mean()
                         diversity += reg.item()
@@ -152,11 +152,15 @@ class GNCLClassifier(SKEnsemble):
                         i_mean = i_loss.mean()
                         if self.l_mode == "ncl":
                             reg_loss = i_mean - self.l_reg * reg
+                        elif self.l_mode == "target-var":
+                            #reg_loss = 1.0/self.n_estimators*f_loss + 1.0/self.n_estimators*(self.l_reg - reg)**2
+                            reg_loss = i_mean + 0.001*(self.l_reg - reg)**2
+                            # reg_loss = 1.0/self.n_estimators*f_loss - self.l_reg*reg 
                         elif self.l_mode == "min-var":
                             if reg < self.l_reg:
                                 reg_loss = -2*reg
                             else:
-                                reg_loss = i_mean
+                                reg_loss = f_loss #i_mean
                         elif self.l_mode == "inverse-var":
                             reg_loss = i_mean + self.l_reg*1/reg 
                         elif self.l_mode == "rhs":
@@ -171,14 +175,16 @@ class GNCLClassifier(SKEnsemble):
                     sum_losses.backward()
                     optimizer.step()
 
-                    desc = '[{}/{}] loss {:2.4f} acc {:2.3f} bias {:2.4f} var {:2.4f} avg train acc {:4.3f}'.format(
+                    desc = '[{}/{}] loss {:2.4f} acc {:2.3f} bias {:2.4f} var {:2.4f} avg train acc {:4.3f} min {:4.3f} max {:4.3f}'.format(
                         epoch, 
                         self.epochs-1, 
                         total_loss/example_cnt, 
                         100. * n_correct/example_cnt, 
                         np.mean(ensemble_losses) / example_cnt, 
                         diversity / (batch_cnt * self.n_estimators), 
-                        100. * avg_n_correct/(example_cnt * self.n_estimators)
+                        100. * np.mean(avg_n_correct)/example_cnt,
+                        100. * min(avg_n_correct)/example_cnt,
+                        100. * max(avg_n_correct)/example_cnt
                     )
                     pbar.set_description(desc)
             
@@ -192,14 +198,16 @@ class GNCLClassifier(SKEnsemble):
                         e_acc = accuracy_score(np.argmax(e_output, axis=1),self.y_test)*100.0
                         all_accuracy_test.append(e_acc)
 
-                    desc = '[{}/{}] loss {:2.4f} acc {:2.3f} bias {:2.3f} var {:2.4f} avg train acc {:4.3f} test acc {:4.3f}'.format(
+                    desc = '[{}/{}] loss {:2.4f} acc {:2.3f} bias {:2.3f} var {:2.4f} avg train acc {:4.3f} min {:4.3f} max {:4.3f} test acc {:4.3f}'.format(
                         epoch, 
                         self.epochs-1, 
                         total_loss/example_cnt, 
                         100. * n_correct/example_cnt, 
                         np.mean(ensemble_losses) / example_cnt, 
                         diversity / (batch_cnt * self.n_estimators),
-                        100. * avg_n_correct/(example_cnt * self.n_estimators),
+                        100. * np.mean(avg_n_correct)/example_cnt,
+                        100. * min(avg_n_correct)/example_cnt,
+                        100. * max(avg_n_correct)/example_cnt,
                         accuracy_test
                     )
 
@@ -225,7 +233,7 @@ class GNCLClassifier(SKEnsemble):
                         epoch, 
                         total_loss/example_cnt, 
                         100.0*n_correct/example_cnt,
-                        100. * avg_n_correct/(self.n_estimators*example_cnt),
+                        100. * np.mean(avg_n_correct)/example_cnt,
                         accuracy_test,
                         np.mean(all_accuracy_test)
                     )
@@ -234,7 +242,7 @@ class GNCLClassifier(SKEnsemble):
                         epoch, 
                         total_loss/example_cnt, 
                         100.0*n_correct/example_cnt,
-                        100. * avg_n_correct/(self.n_estimators*example_cnt)
+                        100. * np.mean(avg_n_correct)/example_cnt,
                     )
                 
                 for l in ensemble_losses:
