@@ -12,7 +12,7 @@ from sklearn.utils.validation import check_is_fitted
 from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import accuracy_score
 
-from Utils import apply_in_batches
+from Utils import apply_in_batches, TransformTensorDataset
 
 class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
     def __init__(self, optimizer, scheduler, loss_function, 
@@ -123,10 +123,10 @@ class SKLearnModel(SKLearnBaseModel):
             sample_weight = len(y)*sample_weight/np.sum(sample_weight)
             w_tensor = torch.tensor(sample_weight)
             w_tensor = w_tensor.type(torch.FloatTensor)
-            data = torch.utils.data.TensorDataset(x_tensor,y_tensor,w_tensor)
+            data = TransformTensorDataset(x_tensor,y_tensor,w_tensor,transform=self.transformer)
         else:
             w_tensor = None
-            data = torch.utils.data.TensorDataset(x_tensor,y_tensor)
+            data = TransformTensorDataset(x_tensor,y_tensor,transform=self.transformer)
 
         self.X_ = X
         self.y_ = y
@@ -139,6 +139,7 @@ class SKLearnModel(SKLearnBaseModel):
             scheduler = None
 
         cuda_cfg = {'num_workers': 1, 'pin_memory': True} 
+        
         train_loader = torch.utils.data.DataLoader(
             data,
             batch_size=self.batch_size, 
