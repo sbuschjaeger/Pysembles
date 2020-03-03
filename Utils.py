@@ -233,6 +233,7 @@ class TransformTensorDataset(Dataset):
         y = self.y[index]
 
         if self.transform is not None:
+            # TODO Refactor this, so that is automatically converts to pytorch tensors before calling ToPILImage 
             pil_transformer = torchvision.transforms.ToPILImage()
             x = pil_transformer(x)
             x = self.transform(x)
