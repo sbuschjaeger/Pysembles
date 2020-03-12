@@ -67,8 +67,9 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
         self.cuda()
         with torch.no_grad(): 
             ret_val = apply_in_batches(self, X, batch_size = self.batch_size)
-            self.train(before_eval)
-            return ret_val
+
+        self.train(before_eval)
+        return ret_val
 
     def predict(self, X):
         pred = self.predict_proba(X)
@@ -150,13 +151,14 @@ class SKLearnModel(SKLearnBaseModel):
 
         self.cuda()
         self.train()
+
         if self.out_path is not None:
             #file_cnt = sum([1 if "training" in fname else 0 for fname in os.listdir(self.out_path)])
             outfile = open(self.out_path + "/" + self.training_csv, "w", 1)
             if self.x_test is not None:
-                o_str = "epoch,loss,train-accuracy,test-accuracy"
+                o_str = "epoch,train-loss,train-accuracy,test-loss,test-accuracy"
             else:
-                o_str = "epoch,loss,train-accuracy"
+                o_str = "epoch,train-loss,train-accuracy"
 
             outfile.write(o_str + "\n")
 
@@ -171,6 +173,7 @@ class SKLearnModel(SKLearnBaseModel):
                     target = batch[1]
                     data, target = data.cuda(), target.cuda()
                     data, target = Variable(data), Variable(target)
+                    
                     if sample_weight is not None:
                         weights = batch[2]
                         weights = weights.cuda()
@@ -211,23 +214,19 @@ class SKLearnModel(SKLearnBaseModel):
                     pbar.set_description(desc)
             
                 if self.x_test is not None and epoch % self.eval_test == 0:
-                    # output = apply_in_batches(self, self.x_test)
-                    # accuracy_test = accuracy_score(np.argmax(output, axis=1),self.y_test)*100.0
-
-                    output_proba = self.predict_proba(self.x_test)
-                    accuracy_test_proba = accuracy_score(np.argmax(output_proba, axis=1),self.y_test)*100.0
+                    pred_proba = self.predict_proba(self.x_test)
+                    pred_tensor = torch.tensor(pred_proba).cuda()
+                    y_test_tensor = torch.tensor(self.y_test).cuda()
+                    test_loss = self.loss_function(pred_tensor, y_test_tensor).mean().item()
+                    accuracy_test = accuracy_score(self.y_test, np.argmax(pred_proba, axis=1))*100.0  
                     
-                    #with torch.no_grad():
-                    # output = apply_in_batches(self, self.x_test, batch_size = self.batch_size)
-                    # accuracy_test_apply = accuracy_score(np.argmax(output, axis=1),self.y_test)*100.0
-
-                    desc = '[{}/{}] loss {:2.4f} train acc {:2.4f} test acc {:2.4f}'.format(
+                    desc = '[{}/{}] loss {:2.4f} train acc {:2.4f} test loss/acc {:2.4f}/{:2.4f}'.format(
                         epoch, 
                         self.epochs-1, 
                         epoch_loss/example_cnt, 
                         100. * n_correct/example_cnt,
-                        #accuracy_test_apply,
-                        accuracy_test_proba
+                        test_loss,
+                        accuracy_test
                     )
                     pbar.set_description(desc)
 
@@ -241,13 +240,11 @@ class SKLearnModel(SKLearnBaseModel):
                 accuracy = 100.0*n_correct/example_cnt
 
                 if self.x_test is not None:
-                    if epoch % self.eval_test == 0:
-                        output = apply_in_batches(self, self.x_test, batch_size = self.batch_size)
-                        accuracy_test = accuracy_score(np.argmax(output, axis=1),self.y_test)*100.0
-                    else:
+                    if epoch % self.eval_test != 0:
                         accuracy_test = "-"
+                        test_loss = "-"
 
-                    outfile.write("{},{},{},{}\n".format(epoch, avg_loss, accuracy, accuracy_test))
+                    outfile.write("{},{},{},{},{}\n".format(epoch, avg_loss, accuracy, test_loss, accuracy_test))
                 else:
                     outfile.write("{},{},{}\n".format(epoch, avg_loss, accuracy))
         

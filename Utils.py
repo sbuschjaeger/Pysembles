@@ -62,6 +62,7 @@ def dict_to_str(d):
 #             new_modules[m_name] = nn.Linear(m.in_features, m.out_features, hasattr(m, 'bias'))
             
 #             if (hasattr(m, 'bias')):
+#                 # TODO FIX THIS TO new_modules[m_name].bias.data
 #                 new_modules[m_name].weight.bias = binarize(m.bias).data
 #             new_modules[m_name].weight.data = binarize(m.weight).data
 #         elif isinstance(m, BinaryConv2d):
@@ -205,12 +206,19 @@ def weighted_lukas_loss(prediction, target, weights = None):
 def apply_in_batches(model, X, batch_size = 128):
     y_pred = None
     x_tensor = torch.tensor(X)
-    x_tensor = x_tensor.cuda()
     
-    dataset = torch.utils.data.TensorDataset(x_tensor)
+    if hasattr(model, "transformer") and model.transformer is not None:
+        test_transformer =  transforms.Compose([
+                torchvision.transforms.ToPILImage(),
+                transforms.ToTensor() 
+        ])
+    else:
+        test_transformer = None
+    
+    dataset = TransformTensorDataset(x_tensor,transform=test_transformer)
     train_loader = torch.utils.data.DataLoader(dataset, batch_size = batch_size)
-    for batch in train_loader:
-        data = batch[0].cuda()
+    for data in train_loader:
+        data = data.cuda()
         pred = model(data)
         pred = pred.cpu().detach().numpy()
         if y_pred is None:
@@ -223,22 +231,28 @@ def apply_in_batches(model, X, batch_size = 128):
 class TransformTensorDataset(Dataset):
     """TensorDataset with support of transforms.
     """
-    def __init__(self, x_tensor, y_tensor, transform=None):
+    def __init__(self, x_tensor, y_tensor = None, w_tensor = None, transform=None):
         self.x = x_tensor
         self.y = y_tensor
+        self.w = w_tensor
         self.transform = transform
 
     def __getitem__(self, index):
         x = self.x[index]
-        y = self.y[index]
 
         if self.transform is not None:
-            # TODO Refactor this, so that is automatically converts to pytorch tensors before calling ToPILImage 
-            pil_transformer = torchvision.transforms.ToPILImage()
-            x = pil_transformer(x)
             x = self.transform(x)
+        
+        if self.w is not None:
+            y = self.y[index]
+            w = self.w[index]
+            return x, y, w
+        elif self.y is not None:
+            y = self.y[index]
 
-        return x, y
+            return x, y
+        else:
+            return x
 
     def __len__(self):
         return self.x.size(0)
