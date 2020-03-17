@@ -18,6 +18,7 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
     def __init__(self, optimizer, scheduler, loss_function, 
                  base_estimator, 
                  transformer = None,
+                 pipeline = None,
                  seed = None,
                  verbose = True, out_path = None, 
                  x_test = None, y_test = None, eval_test = 5) :
@@ -44,6 +45,7 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
         self.base_estimator = base_estimator
         self.loss_function = loss_function
         self.transformer = transformer
+        self.pipeline = pipeline
         self.verbose = verbose
         self.out_path = out_path
         self.x_test = x_test
@@ -61,6 +63,7 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
             torch.cuda.manual_seed_all(seed)
 
     def predict_proba(self, X):
+        # print("pred proba", X.shape)
         check_is_fitted(self, ['X_', 'y_'])
         before_eval = self.training
         self.eval()
@@ -72,6 +75,7 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
         return ret_val
 
     def predict(self, X):
+        # print("pred", X.shape)
         pred = self.predict_proba(X)
         return np.argmax(pred, axis=1)
 
@@ -109,16 +113,17 @@ class StagedEnsemble(SKEnsemble):
                 yield all_pred*self.n_estimators/(i+1)
 
 class SKLearnModel(SKLearnBaseModel):
-    def __init__(self, training_csv = "training.csv", *args, **kwargs):
+    def __init__(self, training_csv="training.csv", *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.training_csv = training_csv
 
     def fit(self, X, y, sample_weight = None):
         self.classes_ = unique_labels(y)
         self.n_classes_ = len(self.classes_)
-        
+        if self.pipeline:
+            X = self.pipeline.fit_transform(X)
         x_tensor = torch.tensor(X)
-        y_tensor = torch.tensor(y)  
+        y_tensor = torch.tensor(y)
         y_tensor = y_tensor.type(torch.LongTensor) 
 
         if sample_weight is not None:
@@ -250,3 +255,9 @@ class SKLearnModel(SKLearnBaseModel):
         
     def forward(self, x):
         return self.layers_(x)
+
+
+    def predict_proba(self, X):
+        if self.pipeline:
+            return super().predict_proba(self.pipeline.transform(X))
+        return super().predict_proba(X)
