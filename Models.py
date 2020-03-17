@@ -58,7 +58,7 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
             np.random.seed(seed)
             random.seed(seed)
             torch.manual_seed(seed)
-            # if you are suing GPU
+            # if you are using GPU
             torch.cuda.manual_seed(seed)
             torch.cuda.manual_seed_all(seed)
 
