@@ -69,7 +69,10 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
         self.eval()
         self.cuda()
         with torch.no_grad(): 
-            ret_val = apply_in_batches(self, X, batch_size = self.batch_size)
+            if self.pipeline:
+                ret_val = apply_in_batches(self, self.pipeline.transform(X), batch_size=self.batch_size)
+            else:
+                ret_val = apply_in_batches(self, X, batch_size=self.batch_size)
 
         self.train(before_eval)
         return ret_val
@@ -255,9 +258,3 @@ class SKLearnModel(SKLearnBaseModel):
         
     def forward(self, x):
         return self.layers_(x)
-
-
-    def predict_proba(self, X):
-        if self.pipeline:
-            return super().predict_proba(self.pipeline.transform(X))
-        return super().predict_proba(X)
