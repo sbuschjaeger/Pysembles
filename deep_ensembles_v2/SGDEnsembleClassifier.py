@@ -16,8 +16,8 @@ from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import accuracy_score
 
-from Models import SKEnsemble
-from Utils import apply_in_batches, cov, weighted_mse_loss, weighted_squared_hinge_loss
+from .Models import SKEnsemble
+from .Utils import apply_in_batches, cov, weighted_mse_loss, weighted_squared_hinge_loss
 
 class SGDEnsembleClassifier(SKEnsemble):
     def __init__(self, n_estimators = 5, *args, **kwargs):

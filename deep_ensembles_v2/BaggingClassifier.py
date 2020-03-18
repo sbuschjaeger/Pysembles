@@ -6,9 +6,9 @@ from torch import nn
 
 from sklearn.utils.multiclass import unique_labels
 
-from Models import SKLearnModel
-from Models import StagedEnsemble
-from BinarisedNeuralNetworks import BinaryConv2d, BinaryLinear
+from .Models import SKLearnModel
+from .Models import StagedEnsemble
+from .BinarisedNeuralNetworks import BinaryConv2d, BinaryLinear
 
 import copy
 

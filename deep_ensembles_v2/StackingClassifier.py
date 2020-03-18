@@ -14,10 +14,10 @@ from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import accuracy_score
 
-from Models import SKLearnModel
+from .Models import SKLearnModel
 # from Models import Flatten
-from BinarisedNeuralNetworks import BinaryTanh
-from BinarisedNeuralNetworks import BinaryLinear
+from .BinarisedNeuralNetworks import BinaryTanh
+from .BinarisedNeuralNetworks import BinaryLinear
 
 class StackingClassifier(SKLearnModel):
     def __init__(self, optimizer_dict, scheduler_dict, loss_function, base_estimator,verbose = True, out_path = None,  n_estimators = 5, l_reg = 0):

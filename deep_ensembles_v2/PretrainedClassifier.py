@@ -6,8 +6,8 @@ from torch import nn
 import torchvision.models as models
 
 from sklearn.utils.multiclass import unique_labels
-from Utils import Flatten
-from Models import SKLearnModel
+from .Utils import Flatten
+from .Models import SKLearnModel
 
 class PretrainedClassifier(SKLearnModel):
     def __init__(self, model_name, *args, **kwargs):

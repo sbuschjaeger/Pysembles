@@ -16,7 +16,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import check_is_fitted
 from sklearn.metrics import accuracy_score
 
-from Utils import apply_in_batches, TransformTensorDataset
+from .Utils import apply_in_batches, TransformTensorDataset
 
 
 def collect_all_path(node, cur_path, was_left, all_paths):
