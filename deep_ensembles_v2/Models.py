@@ -12,7 +12,7 @@ from sklearn.utils.validation import check_is_fitted
 from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import accuracy_score
 
-from .Utils import apply_in_batches, TransformTensorDataset
+from .Utils import apply_in_batches, TransformTensorDataset, store_model
 
 class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
     def __init__(self, optimizer, scheduler, loss_function, 
@@ -61,6 +61,9 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
             # if you are using GPU
             torch.cuda.manual_seed(seed)
             torch.cuda.manual_seed_all(seed)
+
+    def store(self, out_path, dim, name="model"):
+        store_model(self, "{}/{}.onnx".format(out_path,name), dim, verbose=self.verbose)
 
     def predict_proba(self, X):
         # print("pred proba", X.shape)

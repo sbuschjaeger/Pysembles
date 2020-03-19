@@ -1,18 +1,21 @@
-from collections import OrderedDict
+# from collections import OrderedDict
 from functools import partial
 import inspect
 import warnings
 
 import numpy as np
+import copy 
 
 import torch
 from torch import nn
-from torch.utils.data import Dataset, TensorDataset
-from torch.autograd import Variable
-from torch.optim.optimizer import Optimizer, required
+from torch.utils.data import Dataset
+# from torch.autograd import Variable
+# from torch.optim.optimizer import Optimizer, required
 
 import torchvision
 import torchvision.transforms as transforms
+
+from .BinarisedNeuralNetworks import binarize, BinaryTanh, BinaryLinear, BinaryConv2d
 
 def flatten_dict(d):
     flat_dict = {}
@@ -42,40 +45,73 @@ def replace_objects(d):
 def dict_to_str(d):
     return str(replace_objects(d)).replace(":","=").replace(",","_").replace("\"","").replace("\'","").replace("{","").replace("}","").replace(" ", "")
 
-# def store_model(model, path, dim, verbose = False):
-#     dummy_input = torch.randn((1,*dim), device="cuda")
+def replace_layer_if_possible(layer):
+    class Sign(nn.Module):
+        def __init__(self):
+            super(Sign, self).__init__()
 
-#     class Sign(nn.Module):
-#         def __init__(self):
-#             super(Sign, self).__init__()
-
-#         def forward(self, input):
-#             return torch.where(input > 0, torch.tensor([1.0]).cuda(), torch.tensor([-1.0]).cuda())
-
-#     new_modules = OrderedDict()
-#     for m_name, m in model._modules.items():
-#         if isinstance(m, BinaryTanh):
-#             new_modules[m_name] = Sign()
-#         elif isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d)):
-#             new_modules[m_name] = m
-#         elif isinstance(m, BinaryLinear):
-#             new_modules[m_name] = nn.Linear(m.in_features, m.out_features, hasattr(m, 'bias'))
-            
-#             if (hasattr(m, 'bias')):
-#                 # TODO FIX THIS TO new_modules[m_name].bias.data
-#                 new_modules[m_name].weight.bias = binarize(m.bias).data
-#             new_modules[m_name].weight.data = binarize(m.weight).data
-#         elif isinstance(m, BinaryConv2d):
-#             new_modules[m_name] = nn.Conv2d(m.in_channels, m.out_channels, m.kernel_size, m.stride, m.padding, m.dilation, m.groups, hasattr(m, 'bias'), m.padding_mode)
-#             if (hasattr(m, 'bias')):
-#                 new_modules[m_name].weight.bias = binarize(m.bias).data
-#             new_modules[m_name].weight.data = binarize(m.weight).data
-#         else:
-#             new_modules[m_name] = m
+        def forward(self, input):
+            return torch.where(input > 0, torch.tensor([1.0]).cuda(), torch.tensor([-1.0]).cuda())
     
-#     with warnings.catch_warnings():
-#         warnings.simplefilter("ignore")
-#         torch.onnx.export(nn.Sequential(new_modules).cuda(), dummy_input, path, verbose=verbose, input_names=["input"], output_names=["output"])
+    print("FOUND ", layer)
+    if isinstance(layer, BinaryTanh):
+        print("REPLACING BINARY TANH")
+        new_layer = Sign()
+    elif isinstance(layer, BinaryLinear):
+        print("REPLACING LIN LAYER")
+        new_layer = nn.Linear(layer.in_features, layer.out_features, hasattr(layer, 'bias'))
+        if hasattr(layer, 'bias'):
+            new_layer.bias.data = binarize(layer.bias).data
+        new_layer.weight.data = binarize(layer.weight).data
+    elif isinstance(layer, BinaryConv2d):
+        print("REPLACING CONV LAYER")
+        new_layer = nn.Conv2d(
+            layer.in_channels, layer.out_channels, layer.kernel_size, 
+            layer.stride, layer.padding, layer.dilation, layer.groups, 
+            hasattr(layer, 'bias'), layer.padding_mode
+        )
+        if hasattr(layer, 'bias'):
+            new_layer.bias.data = binarize(layer.bias).data
+        new_layer.data = binarize(layer.weight).data
+    else:
+        new_layer = layer
+    return new_layer
+
+def replace_sequential_if_possible(s):
+    for i,si in enumerate(s):
+        if hasattr(s[i], "layers_"):
+            s[i].layers_ = replace_sequential_if_possible(s[i].layers_)
+        if isinstance(s[i], nn.Sequential):
+            s[i] = replace_sequential_if_possible(s[i])
+        else:
+            s[i] = replace_layer_if_possible(s[i])
+        # new_seq.append(tmp)
+    return s
+
+def store_model(model, path, dim, verbose = False):
+    # Since we change layers in-place we copy it beforehand
+    model = copy.deepcopy(model)
+    print("BEFORE REPLACE:", model)
+
+    model.layers_ = replace_sequential_if_possible(model.layers_)
+    # for i in range(len(model.layers_)):
+    #     model.layers_[i] = replace_layer_if_possible(model.layers_[i])
+
+    #new_modules = OrderedDict()
+    #for m_name, m in model._modules.items():
+    # for m in model.modules():
+    #     #new_modules[m_name] = replace_if_possible(m)
+    #     if isinstance(m, nn.Sequential):
+    #         m = replace_sequential_if_possible(m)
+    #     else:
+    #         m = replace_layer_if_possible(m)
+    #     #m = replace_if_possible(m)
+    
+    print("AFTER REPLACE:", model)
+    dummy_input = torch.randn((1,*dim), device="cuda")
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        torch.onnx.export(model.cuda(), dummy_input, path, verbose=verbose, input_names=["input"], output_names=["output"])
 
 # See: https://github.com/pytorch/pytorch/issues/19037
 def cov(x, rowvar=False, bias=False, ddof=None, aweights=None):
