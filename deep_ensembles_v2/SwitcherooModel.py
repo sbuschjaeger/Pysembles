@@ -8,10 +8,10 @@ import torchvision.models as models
 
 from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import accuracy_score
-from .Utils import Flatten, TransformTensorDataset, apply_in_batches
-from .Models import SKLearnModel
+from Utils import Flatten, TransformTensorDataset, apply_in_batches, Scale
+from Models import SKLearnModel
 
-from .BinarisedNeuralNetworks import binarize, BinaryTanh, BinaryLinear, BinaryConv2d
+from BinarisedNeuralNetworks import binarize, BinaryTanh, BinaryLinear, BinaryConv2d
 
 class SwitcherooModel(SKLearnModel):
     def __init__(self, switch_epoch, *args, **kwargs):
@@ -23,8 +23,8 @@ class SwitcherooModel(SKLearnModel):
         self.n_classes_ = len(self.classes_)
         
         x_tensor = torch.tensor(X)
-        y_tensor = torch.tensor(y)  
-        y_tensor = y_tensor.type(torch.LongTensor) 
+        y_tensor = torch.tensor(y)
+        y_tensor = y_tensor.type(torch.LongTensor)
 
         if sample_weight is not None:
             sample_weight = len(y)*sample_weight/np.sum(sample_weight)
@@ -70,27 +70,30 @@ class SwitcherooModel(SKLearnModel):
         for epoch in range(self.epochs):
             # Perform the switcheroo
             if epoch == self.switch_epoch:
-                new_modules = OrderedDict()
-                for m_name, m in self._modules.items():
-                    if isinstance(m, nn.ReLU):
-                        new_modules[m_name] = BinaryTanh()
+                new_modules = []# OrderedDict()
+                for m in self.layers_:
+                    if isinstance(m, nn.ReLU) or isinstance(m, nn.Tanh):
+                        new_modules.append(BinaryTanh())
                     elif isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d)):
-                        new_modules[m_name] = m
+                        new_modules.append(m)
                     elif isinstance(m, nn.Linear):
-                        new_modules[m_name] = BinaryLinear(m.in_features, m.out_features, hasattr(m, 'bias'))
+                        new_modules.append(BinaryLinear(m.in_features, m.out_features, hasattr(m, 'bias')))
                         
                         if (hasattr(m, 'bias')):
-                            new_modules[m_name].bias.data = binarize(m.bias).data
-                        new_modules[m_name].weight.data = binarize(m.weight).data
+                            new_modules[-1].bias.data = m.bias.data #binarize(m.bias).data
+                        new_modules[-1].weight.data = m.weight.data#.clamp(-1,1) #binarize(m.weight).data
                     elif isinstance(m, nn.Conv2d):
-                        new_modules[m_name] = BinaryConv2d(m.in_channels, m.out_channels, m.kernel_size, m.stride, m.padding, m.dilation, m.groups, hasattr(m, 'bias'), m.padding_mode)
+                        new_modules.append(BinaryConv2d(m.in_channels, m.out_channels, m.kernel_size, m.stride, m.padding, m.dilation, m.groups, hasattr(m, 'bias'), m.padding_mode))
                         if (hasattr(m, 'bias')):
-                            new_modules[m_name].bias.bias = binarize(m.bias).data
-                        new_modules[m_name].weight.data = binarize(m.weight).data
+                            new_modules[-1].bias.bias = m.bias.data #binarize(m.bias).data
+                        new_modules[-1].weight.data = m.weight.data#.clamp(-1,1) #binarize(m.weight).data
                     else:
-                        new_modules[m_name] = m
-                
-                self.layers_ = nn.Sequential(new_modules)
+                        new_modules.append(m)
+                new_modules.append(Scale())
+                print(self.layers_)
+                self.layers_ = nn.Sequential(*new_modules)
+                print(new_modules)
+                print(self.layers_)
                 self.cuda()
                 self.train()
                 optimizer = self.optimizer_method(self.parameters(), **self.optimizer)
@@ -105,7 +108,7 @@ class SwitcherooModel(SKLearnModel):
             n_correct = 0
             example_cnt = 0
             batch_cnt = 0
-            with tqdm(total=len(train_loader.dataset), ncols=135, disable = not self.verbose) as pbar:
+            with tqdm.tqdm(total=len(train_loader.dataset), ncols=135, disable = not self.verbose) as pbar:
                 for batch in train_loader:
                     data = batch[0]
                     target = batch[1]
