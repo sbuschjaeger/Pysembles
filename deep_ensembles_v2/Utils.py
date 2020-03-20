@@ -79,11 +79,15 @@ def replace_layer_if_possible(layer):
 
 def replace_sequential_if_possible(s):
     for i,si in enumerate(s):
+        print("CHECKING ", si)
         if hasattr(s[i], "layers_"):
+            print("LAYERS_ FOUND, REPLACING")
             s[i].layers_ = replace_sequential_if_possible(s[i].layers_)
         if isinstance(s[i], nn.Sequential):
+            print("SEQUENTIAL FOUND; REPLACING")
             s[i] = replace_sequential_if_possible(s[i])
         else:
+            print("REGULAR LAYER FOUND")
             s[i] = replace_layer_if_possible(s[i])
         # new_seq.append(tmp)
     return s
