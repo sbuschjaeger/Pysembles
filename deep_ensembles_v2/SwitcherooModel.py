@@ -30,10 +30,10 @@ class SwitcherooModel(SKLearnModel):
             sample_weight = len(y)*sample_weight/np.sum(sample_weight)
             w_tensor = torch.tensor(sample_weight)
             w_tensor = w_tensor.type(torch.FloatTensor)
-            data = TransformTensorDataset(x_tensor,y_tensor,w_tensor,transform=self.transformer)
+            data = TransformTensorDataset(x_tensor, y_tensor, w_tensor, transform=self.transformer)
         else:
             w_tensor = None
-            data = TransformTensorDataset(x_tensor,y_tensor,transform=self.transformer)
+            data = TransformTensorDataset(x_tensor, y_tensor, transform=self.transformer)
 
         self.X_ = X
         self.y_ = y

@@ -47,8 +47,8 @@ class DistillationModel(SKLearnModel):
 
         train_loader = torch.utils.data.DataLoader(
             data,
-            batch_size=self.batch_size, 
-            shuffle=False, 
+            batch_size=self.batch_size,
+            shuffle=False,
             **cuda_cfg
         )
 
