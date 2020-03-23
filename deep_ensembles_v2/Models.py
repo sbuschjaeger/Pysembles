@@ -66,6 +66,7 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
         shallow_copy = copy.copy(self)
         shallow_copy.X_ = np.array(1)
         shallow_copy.y_ = np.array(1)
+        shallow_copy.base_estimator = None
         shallow_copy.x_test = None
         shallow_copy.y_test = None
         torch.save(shallow_copy, os.path.join(out_path, name + ".pickle"))
