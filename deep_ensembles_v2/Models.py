@@ -63,7 +63,8 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
             torch.cuda.manual_seed_all(seed)
 
     def store(self, out_path, dim, name="model"):
-        store_model(self, "{}/{}.onnx".format(out_path,name), dim, verbose=self.verbose)
+        torch.save(self, os.path.join(out_path, name + ".pickle"))
+        store_model(self, "{}/{}.onnx".format(out_path, name), dim, verbose=self.verbose)
 
     def predict_proba(self, X):
         # print("pred proba", X.shape)
@@ -231,6 +232,8 @@ class SKLearnModel(SKLearnBaseModel):
                     test_loss = self.loss_function(pred_tensor, y_test_tensor).mean().item()
                     accuracy_test = accuracy_score(self.y_test, np.argmax(pred_proba, axis=1))*100.0  
                     
+                    self.store(self.out_path, name="model_{}".format(epoch))
+
                     desc = '[{}/{}] loss {:2.4f} train acc {:2.4f} test loss/acc {:2.4f}/{:2.4f}'.format(
                         epoch, 
                         self.epochs-1, 
