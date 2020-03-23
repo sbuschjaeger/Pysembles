@@ -225,7 +225,8 @@ class SKLearnModel(SKLearnBaseModel):
                     )
                     pbar.set_description(desc)
             
-                if self.x_test is not None and epoch % self.eval_test == 0:
+                if self.x_test is not None and epoch % self.eval_test == self.eval_test - 1:
+
                     pred_proba = self.predict_proba(self.x_test)
                     pred_tensor = torch.tensor(pred_proba).cuda()
                     y_test_tensor = torch.tensor(self.y_test).cuda()
@@ -254,7 +255,7 @@ class SKLearnModel(SKLearnBaseModel):
                 accuracy = 100.0*n_correct/example_cnt
 
                 if self.x_test is not None:
-                    if epoch % self.eval_test != 0:
+                    if epoch % self.eval_test != self.eval_test - 1:
                         accuracy_test = "-"
                         test_loss = "-"
 
