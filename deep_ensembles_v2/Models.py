@@ -12,7 +12,7 @@ from sklearn.utils.validation import check_is_fitted
 from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import accuracy_score
 
-from .Utils import apply_in_batches, TransformTensorDataset, store_model
+from .Utils import apply_in_batches, store_model, TransformTensorDataset
 
 class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
     def __init__(self, optimizer, scheduler, loss_function, 
@@ -63,7 +63,12 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
             torch.cuda.manual_seed_all(seed)
 
     def store(self, out_path, dim, name="model"):
-        torch.save(self, os.path.join(out_path, name + ".pickle"))
+        shallow_copy = copy.copy(self)
+        shallow_copy.X_ = np.array(1)
+        shallow_copy.y_ = np.array(1)
+        shallow_copy.x_test = None
+        shallow_copy.y_test = None
+        torch.save(shallow_copy, os.path.join(out_path, name + ".pickle"))
         store_model(self, "{}/{}.onnx".format(out_path, name), dim, verbose=self.verbose)
 
     def predict_proba(self, X):
@@ -233,7 +238,7 @@ class SKLearnModel(SKLearnBaseModel):
                     test_loss = self.loss_function(pred_tensor, y_test_tensor).mean().item()
                     accuracy_test = accuracy_score(self.y_test, np.argmax(pred_proba, axis=1))*100.0  
                     
-                    self.store(self.out_path, name="model_{}".format(epoch))
+                    self.store(self.out_path, name="model_{}".format(epoch), dim=self.x_test[0].shape)
 
                     desc = '[{}/{}] loss {:2.4f} train acc {:2.4f} test loss/acc {:2.4f}/{:2.4f}'.format(
                         epoch, 
