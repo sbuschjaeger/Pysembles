@@ -72,7 +72,7 @@ def replace_layer_if_possible(layer):
         )
         if hasattr(layer, 'bias'):
             new_layer.bias.data = binarize(layer.bias).data
-        new_layer.data = binarize(layer.weight).data
+        new_layer.weight.data = binarize(layer.weight).data
     else:
         new_layer = layer
     return new_layer

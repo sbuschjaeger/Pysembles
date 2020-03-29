@@ -69,8 +69,9 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
         shallow_copy.base_estimator = None
         shallow_copy.x_test = None
         shallow_copy.y_test = None
-        torch.save(shallow_copy, os.path.join(out_path, name + ".pickle"))
+        torch.save(shallow_copy.cpu(), os.path.join(out_path, name + ".pickle"))
         store_model(self, "{}/{}.onnx".format(out_path, name), dim, verbose=self.verbose)
+        self.cuda()
 
     def predict_proba(self, X):
         # print("pred proba", X.shape)
