@@ -21,7 +21,9 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
                  pipeline = None,
                  seed = None,
                  verbose = True, out_path = None, 
-                 x_test = None, y_test = None, eval_test = 5) :
+                 x_test = None, y_test = None, 
+                 eval_test = 5,
+                 store_on_eval = False) :
         super().__init__()
         
         if optimizer is not None:
@@ -53,7 +55,8 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
         self.seed = seed
         self.eval_test = eval_test
         self.layers_ = self.base_estimator()
-        
+        self.store_on_eval = store_on_eval
+
         if seed is not None:
             np.random.seed(seed)
             random.seed(seed)
@@ -240,7 +243,8 @@ class SKLearnModel(SKLearnBaseModel):
                     test_loss = self.loss_function(pred_tensor, y_test_tensor).mean().item()
                     accuracy_test = accuracy_score(self.y_test, np.argmax(pred_proba, axis=1))*100.0  
                     
-                    self.store(self.out_path, name="model_{}".format(epoch), dim=self.x_test[0].shape)
+                    if self.store_on_eval:
+                        self.store(self.out_path, name="model_{}".format(epoch), dim=self.x_test[0].shape)
 
                     desc = '[{}/{}] loss {:2.4f} train acc {:2.4f} test loss/acc {:2.4f}/{:2.4f}'.format(
                         epoch, 
