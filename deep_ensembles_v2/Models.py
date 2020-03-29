@@ -12,7 +12,7 @@ from sklearn.utils.validation import check_is_fitted
 from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import accuracy_score
 
-from .Utils import apply_in_batches, TransformTensorDataset, store_model
+from .Utils import apply_in_batches, store_model, TransformTensorDataset
 
 class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
     def __init__(self, optimizer, scheduler, loss_function, 
@@ -21,7 +21,9 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
                  pipeline = None,
                  seed = None,
                  verbose = True, out_path = None, 
-                 x_test = None, y_test = None, eval_test = 5) :
+                 x_test = None, y_test = None, 
+                 eval_test = 5,
+                 store_on_eval = False) :
         super().__init__()
         
         if optimizer is not None:
@@ -53,7 +55,8 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
         self.seed = seed
         self.eval_test = eval_test
         self.layers_ = self.base_estimator()
-        
+        self.store_on_eval = store_on_eval
+
         if seed is not None:
             np.random.seed(seed)
             random.seed(seed)
@@ -63,7 +66,14 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
             torch.cuda.manual_seed_all(seed)
 
     def store(self, out_path, dim, name="model"):
-        store_model(self, "{}/{}.onnx".format(out_path,name), dim, verbose=self.verbose)
+        shallow_copy = copy.copy(self)
+        shallow_copy.X_ = np.array(1)
+        shallow_copy.y_ = np.array(1)
+        shallow_copy.base_estimator = None
+        shallow_copy.x_test = None
+        shallow_copy.y_test = None
+        torch.save(shallow_copy, os.path.join(out_path, name + ".pickle"))
+        store_model(self, "{}/{}.onnx".format(out_path, name), dim, verbose=self.verbose)
 
     def predict_proba(self, X):
         # print("pred proba", X.shape)
@@ -224,13 +234,17 @@ class SKLearnModel(SKLearnBaseModel):
                     )
                     pbar.set_description(desc)
             
-                if self.x_test is not None and epoch % self.eval_test == 0:
+                if self.x_test is not None and epoch % self.eval_test == self.eval_test - 1:
+
                     pred_proba = self.predict_proba(self.x_test)
                     pred_tensor = torch.tensor(pred_proba).cuda()
                     y_test_tensor = torch.tensor(self.y_test).cuda()
                     test_loss = self.loss_function(pred_tensor, y_test_tensor).mean().item()
                     accuracy_test = accuracy_score(self.y_test, np.argmax(pred_proba, axis=1))*100.0  
                     
+                    if self.store_on_eval:
+                        self.store(self.out_path, name="model_{}".format(epoch), dim=self.x_test[0].shape)
+
                     desc = '[{}/{}] loss {:2.4f} train acc {:2.4f} test loss/acc {:2.4f}/{:2.4f}'.format(
                         epoch, 
                         self.epochs-1, 
@@ -251,7 +265,7 @@ class SKLearnModel(SKLearnBaseModel):
                 accuracy = 100.0*n_correct/example_cnt
 
                 if self.x_test is not None:
-                    if epoch % self.eval_test != 0:
+                    if epoch % self.eval_test != self.eval_test - 1:
                         accuracy_test = "-"
                         test_loss = "-"
 

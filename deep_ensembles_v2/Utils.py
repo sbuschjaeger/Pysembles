@@ -332,3 +332,13 @@ class Scale(nn.Module):
 
     def forward(self, input):
         return input * self.scale
+
+class SkipConnection(nn.Module):
+    def __init__(self, *block):
+        super().__init__()
+        self.layers_ = torch.nn.Sequential(*block)
+    
+    def forward(self, x):
+        y = self.layers_(x)
+        assert x.shape == y.shape
+        return x + y
