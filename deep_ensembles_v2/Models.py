@@ -135,22 +135,26 @@ class SKLearnModel(SKLearnBaseModel):
         self.training_csv = training_csv
 
     def fit(self, X, y, sample_weight = None):
-        self.classes_ = unique_labels(y)
-        self.n_classes_ = len(self.classes_)
+        # self.classes_ = unique_labels(y[0])
+        # self.n_classes_ = len(self.classes_)
         if self.pipeline:
             X = self.pipeline.fit_transform(X)
         x_tensor = torch.tensor(X)
-        y_tensor = torch.tensor(y)
-        y_tensor = y_tensor.type(torch.LongTensor) 
+        if isinstance(y, tuple):
+            y_tensors = [torch.tensor(yy) for yy in y]
+        else:
+            y_tensors = [torch.tensor(y)]
+        # y_tensor = y_tensor.type(torch.LongTensor)
 
         if sample_weight is not None:
+            raise RuntimeError("weighted samples not implemented in multi-head branch")
             sample_weight = len(y)*sample_weight/np.sum(sample_weight)
             w_tensor = torch.tensor(sample_weight)
             w_tensor = w_tensor.type(torch.FloatTensor)
             data = TransformTensorDataset(x_tensor,y_tensor,w_tensor,transform=self.transformer)
         else:
             w_tensor = None
-            data = TransformTensorDataset(x_tensor,y_tensor,transform=self.transformer)
+            data = TransformTensorDataset(x_tensor, *y_tensors, transform=self.transformer)
 
         self.X_ = X
         self.y_ = y
@@ -178,7 +182,10 @@ class SKLearnModel(SKLearnBaseModel):
             #file_cnt = sum([1 if "training" in fname else 0 for fname in os.listdir(self.out_path)])
             outfile = open(self.out_path + "/" + self.training_csv, "w", 1)
             if self.x_test is not None:
-                o_str = "epoch,train-loss,train-accuracy,test-loss,test-accuracy"
+                if hasattr(self.loss_function, "test_statistics_header"):
+                    o_str = "epoch,train-loss,train-accuracy,{},test-accuracy".format(self.loss_function.test_statistics_header())
+                else:
+                    o_str = "epoch,train-loss,train-accuracy,test-loss,test-accuracy"
             else:
                 o_str = "epoch,train-loss,train-accuracy"
 
@@ -191,34 +198,45 @@ class SKLearnModel(SKLearnBaseModel):
             batch_cnt = 0
             with tqdm(total=len(train_loader.dataset), ncols=135, disable = not self.verbose) as pbar:
                 for batch in train_loader:
-                    data = batch[0]
-                    target = batch[1]
-                    data, target = data.cuda(), target.cuda()
-                    data, target = Variable(data), Variable(target)
+                    data = batch[0].cuda()
+                    targets = [target.cuda() for target in batch[1]]
+                    # data, target = data.cuda(), target.cuda()
+                    # data, target = Variable(data), Variable(target)
                     
                     if sample_weight is not None:
                         weights = batch[2]
                         weights = weights.cuda()
                         weights = Variable(weights)
+                    # print(data.shape)
+                    # print(len(targets))
+                    # print(tuple(t.shape for t in targets))
+                    with torch.autograd.detect_anomaly():
+                        optimizer.zero_grad()
+                        output = self(data)
+                        # print(len(output))
+                        # print(output.shape)
 
-                    optimizer.zero_grad()
-                    output = self(data)
-                    unweighted_acc = (output.argmax(1) == target).type(torch.cuda.FloatTensor)
-                    if sample_weight is not None: 
-                        loss = self.loss_function(output, target, weights)
-                        epoch_loss += loss.sum().item()
-                        loss = loss.mean()
+                        if isinstance(output, tuple):
+                            unweighted_acc = (output[0].argmax(1) == targets[0]).type(torch.cuda.FloatTensor)
+                        else:
+                            unweighted_acc = (output.argmax(1) == targets[0]).type(torch.cuda.FloatTensor)
+                        # if sample_weight is not None: 
+                        #     loss = self.loss_function(output, targets, weights)
+                        #     epoch_loss += loss.sum().item()
+                        #     loss = loss.mean()
 
-                        weighted_acc = unweighted_acc*weights
-                        n_correct += weighted_acc.sum().item()
-                    else:
-                        loss = self.loss_function(output, target)
+                        #     weighted_acc = unweighted_acc*weights
+                        #     n_correct += weighted_acc.sum().item()
+                        # else:
+                        # print(self.loss_function.params())
+                        # print(self.loss_function.device)
+                        loss = self.loss_function(output, *targets)
                         epoch_loss += loss.sum().item()
                         loss = loss.mean()
                         n_correct += unweighted_acc.sum().item()
-                    
-                    loss.backward()
-                    optimizer.step()
+                        
+                        loss.backward()
+                        optimizer.step()
 
                     pbar.update(data.shape[0])
                     example_cnt += data.shape[0]
@@ -228,9 +246,9 @@ class SKLearnModel(SKLearnBaseModel):
                     # print(self.layers_[-3].running_mean)
                     # print("")
                     desc = '[{}/{}] loss {:2.4f} acc {:2.4f}'.format(
-                        epoch, 
-                        self.epochs-1, 
-                        epoch_loss/example_cnt, 
+                        epoch,
+                        self.epochs - 1,
+                        epoch_loss/example_cnt,
                         100. * n_correct/example_cnt
                     )
                     pbar.set_description(desc)
@@ -238,15 +256,30 @@ class SKLearnModel(SKLearnBaseModel):
                 if self.x_test is not None and epoch % self.eval_test == self.eval_test - 1:
 
                     pred_proba = self.predict_proba(self.x_test)
-                    pred_tensor = torch.tensor(pred_proba).cuda()
-                    y_test_tensor = torch.tensor(self.y_test).cuda()
-                    test_loss = self.loss_function(pred_tensor, y_test_tensor).mean().item()
-                    accuracy_test = accuracy_score(self.y_test, np.argmax(pred_proba, axis=1))*100.0  
+                    if isinstance(pred_proba, tuple):
+                        print("Loss-Weights: 1 /", self.loss_function.running_means)
+                        pred_tensor = tuple(torch.tensor(p).cuda() for p in pred_proba)
+                        # y_test_tensor = torch.tensor(self.y_test).cuda()
+                        y_test_tensors = [torch.tensor(yy).cuda() for yy in self.y_test]
+                        if hasattr(self.loss_function, "test_statistics"):
+                            test_loss = self.loss_function.test_statistics(pred_tensor, *y_test_tensors)
+                            print(test_loss)
+                            test_loss = str(tuple(x.item() for x in test_loss))[1:-1]
+                        else:
+                            test_loss = self.loss_function(pred_tensor, *y_test_tensors).mean().item()
+                        accuracy_test = accuracy_score(self.y_test[0], np.argmax(pred_proba[0], axis=1))*100.0  
+                    else:
+                        pred_tensor = torch.tensor(pred_proba).cuda()
+                        y_test_tensor = torch.tensor(self.y_test).cuda()
+                      
+                        test_loss = self.loss_function(pred_tensor, y_test_tensor).mean().item()
+                        accuracy_test = accuracy_score(self.y_test, np.argmax(pred_proba, axis=1))*100.0  
+                   
                     
                     if self.store_on_eval:
                         self.store(self.out_path, name="model_{}".format(epoch), dim=self.x_test[0].shape)
 
-                    desc = '[{}/{}] loss {:2.4f} train acc {:2.4f} test loss/acc {:2.4f}/{:2.4f}'.format(
+                    desc = '[{}/{}] loss {:2.4f} train acc {:2.4f} test loss/acc {}/{:2.4f}'.format(
                         epoch, 
                         self.epochs-1, 
                         epoch_loss/example_cnt, 

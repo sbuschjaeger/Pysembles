@@ -260,20 +260,28 @@ def apply_in_batches(model, X, batch_size = 128):
     for data in train_loader:
         data = data.cuda()
         pred = model(data)
-        pred = pred.cpu().detach().numpy()
-        if y_pred is None:
-            y_pred = pred
-        else:
-            y_pred = np.concatenate( (y_pred, pred), axis=0 )
+        if isinstance(pred, tuple):
+            pred = (p.cpu().detach().numpy() for p in pred)
+            if y_pred is None:
+                y_pred = pred
+            else:
+                y_pred = tuple(np.concatenate((y, p), axis=0) for y, p in zip(y_pred, pred))
+        else:#
+            pred = pred.cpu().detach().numpy()
+            if y_pred is None:
+                y_pred = pred
+            else:
+                y_pred = np.concatenate((y_pred, pred), axis=0)
+
     return y_pred
 
 # See: https://stackoverflow.com/questions/55588201/pytorch-transforms-on-tensordataset/55593757
 class TransformTensorDataset(Dataset):
     """TensorDataset with support of transforms.
     """
-    def __init__(self, x_tensor, y_tensor = None, w_tensor = None, transform=None):
+    def __init__(self, x_tensor, *y_tensors, w_tensor=None, transform=None):
         self.x = x_tensor
-        self.y = y_tensor
+        self.y = y_tensors
         self.w = w_tensor
         self.transform = transform
 
@@ -284,11 +292,11 @@ class TransformTensorDataset(Dataset):
             x = self.transform(x)
         
         if self.w is not None:
-            y = self.y[index]
+            y = tuple(y[index] for y in self.y)
             w = self.w[index]
             return x, y, w
-        elif self.y is not None:
-            y = self.y[index]
+        elif self.y:
+            y = tuple(y[index] for y in self.y)
 
             return x, y
         else:
@@ -342,3 +350,134 @@ class SkipConnection(nn.Module):
         y = self.layers_(x)
         assert x.shape == y.shape
         return x + y
+
+class DispLoss(nn.Module):
+    def __init__(self, reduction):
+        super().__init__()
+        self.magnitude = torch.nn.L1Loss(reduction=reduction)
+        self.sign = torch.nn.MarginRankingLoss(margin=1, reduction=reduction)
+    def forward(self, x, target):
+        # print(x, target.sign(), self.sign(x, target.sign()).view(-1))
+        # asdfd
+        l = self.magnitude(x.abs(), target.abs().view(-1, 1)).view(-1)
+        l2 = self.sign(x.view(-1),torch.zeros_like(x.view(-1)), target.sign().view(-1)).view(-1)
+        z = torch.zeros_like(l)
+        # print(target.shape, l.shape, l2.shape, z.shape)
+        # print(l2[target.view(-1) == target.view(-1)])
+        # aadsf
+        l = torch.where(torch.isnan(target.view(-1)), z, l + l2)
+        # print(l)
+        # asdfa
+        return l
+
+class LogEnergyLoss(nn.L1Loss):
+    def forward(self, x, target):
+        l = super().forward(x, target)
+        l = torch.where(torch.isnan(target), l, l / torch.where(torch.isnan(target), torch.ones_like(target), target.abs()))
+        if torch.isnan(l).all():
+            print(l, l.shape, target.shape)
+            asdfads
+        return l
+
+class NormalizedL1Loss(nn.L1Loss):
+    def forward(self, x, target):
+        l = super().forward(x, target)
+        l = torch.where(torch.isnan(target), l, l / torch.where(torch.isnan(target), torch.ones_like(target), target.abs()))
+        if torch.isnan(l).all():
+            print(l, l.shape, target.shape)
+            asdfads
+        return l
+        
+class L2Loss(nn.L1Loss):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+    def forward(self, x, target):
+        z = torch.zeros_like(target)
+        t = torch.where(torch.isnan(target), z, target)
+        l = torch.where(torch.isnan(target), z, x * x - x * t + t * t)
+        return l
+
+class NanLoss(nn.Module):
+    def __init__(self, loss, reduction):
+        super().__init__()
+        self.loss = loss(reduction=reduction)
+    def __repr__(self):
+        return self.loss.__class__.__name__
+    def forward(self, x, target):
+        l = self.loss(x, target)
+        z = torch.zeros_like(target, dtype=torch.float32)
+        # print(l)
+        return torch.where(torch.isnan(target), z, l)
+        # print(l)
+        return l
+
+class MultiHead(nn.Module):
+    def __init__(self, n_input, *n_targets, n_layers=1, n_hidden=128, activation=torch.nn.ReLU):
+        super().__init__()
+        if n_layers == 1:
+            self.heads = torch.nn.ModuleList(
+                [
+                    torch.nn.Linear(n_input, n_output) for n_output in n_targets
+                ]
+            )
+        else:
+            self.heads = torch.nn.ModuleList(
+                [
+                    torch.nn.Sequential(
+                        *sum([[torch.nn.Linear(n_input if l == 0 else n_hidden, n_hidden), activation()] for l in range(n_layers-1)], []),
+                        torch.nn.Linear(n_hidden, n_output)
+                    ) for n_output in n_targets
+                ]
+            )
+    def forward(self, x):
+        return tuple(head(x) for head in self.heads)
+
+class MultiHeadLoss(nn.Module):
+    def __init__(self, *losses):
+        super().__init__()
+        self.losses = losses
+        self.last_loss = None
+        self.running_means = torch.ones(len(losses), requires_grad=False)
+        # self.register_buffer("running_means", torch.zeros(len(losses)))
+        self.t = 1 + torch.ones(1, requires_grad=False)
+        # self.register_buffer("t", torch.ones(1, requires_grad=False))
+    def test_statistics_header(self):
+        return ",".join(["test_loss"] + ["test_loss_{}".format(l) for i, l in enumerate(self.losses)])
+    def test_statistics(self, x, *targets):
+        def flatten(l):
+            if len(l.shape) > 1:
+                return l.sum(dim=1)
+            return l.view(-1)
+        unscaled = [flatten(loss(prediction, target)).mean() for loss, prediction, target in zip(self.losses, x, targets)]
+        losses = [l / (s + 0.001) for l, s in zip(unscaled, self.running_means)]
+        # losses = [l / (torch.sqrt((l**2).mean()) + 0.001) for l in losses]
+        # print(losses[1].shape)
+        scaled = sum(losses) / torch.tensor(len(self.losses))
+        return (scaled, *unscaled)
+
+
+    def forward(self, x, *targets):
+        # print(tuple(o.shape for o in x))
+        # print(tuple(o.shape for o in targets))
+        # print([loss(prediction, target).shape for loss, prediction, target in zip(self.losses, x, targets)])
+        def flatten(l):
+            if len(l.shape) > 1:
+                return l.sum(dim=1)
+            return l.view(-1)
+        losses = [flatten(loss(prediction, target)) for loss, prediction, target in zip(self.losses, x, targets)]
+
+        if self.train:
+            current = torch.tensor([l.detach().mean() for l in losses])
+            if self.t < 1:
+                self.running_means = current
+            else:
+                #alpha = 1.0 / torch.sqrt(self.t)
+                alpha = 1.0 / (self.t ** 2)
+                self.running_means = (1 - alpha) * self.running_means + alpha * current
+            self.t += 1.0
+            if self.t% 100 == 99:
+                print("\n", current)
+        losses = [l / (s + 0.001) for l, s in zip(losses, self.running_means)]
+        # losses = [l / (torch.sqrt((l**2).mean()) + 0.001) for l in losses]
+        # print(losses[1].shape)
+        return sum(losses) / torch.tensor(len(self.losses))
