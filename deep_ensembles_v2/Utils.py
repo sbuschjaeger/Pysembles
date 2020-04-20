@@ -370,19 +370,11 @@ class DispLoss(nn.Module):
         # asdfa
         return l
 
-class LogEnergyLoss(nn.L1Loss):
-    def forward(self, x, target):
-        l = super().forward(x, target)
-        l = torch.where(torch.isnan(target), l, l / torch.where(torch.isnan(target), torch.ones_like(target), target.abs()))
-        if torch.isnan(l).all():
-            print(l, l.shape, target.shape)
-            asdfads
-        return l
 
 class NormalizedL1Loss(nn.L1Loss):
     def forward(self, x, target):
-        l = super().forward(x, target)
-        l = torch.where(torch.isnan(target), l, l / torch.where(torch.isnan(target), torch.ones_like(target), target.abs()))
+        l = super().forward(torch.exp(x), torch.exp(target))
+        l = torch.where(torch.isnan(target), l, l / torch.where(torch.isnan(target), torch.ones_like(target), torch.exp(target)))
         if torch.isnan(l).all():
             print(l, l.shape, target.shape)
             asdfads
@@ -391,11 +383,19 @@ class NormalizedL1Loss(nn.L1Loss):
 class L2Loss(nn.L1Loss):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.loss = torch.nn.SmoothL1Loss()
+    def __repr__(self):
+        return "L2DistanceLoss"
     def forward(self, x, target):
-        z = torch.zeros_like(target)
+        z = torch.zeros_like(target, requires_grad=False)
         t = torch.where(torch.isnan(target), z, target)
         l = torch.where(torch.isnan(target), z, x * x - x * t + t * t)
-        return l
+        l = l.sum(dim=1)
+        z2 = z.sum(dim=1)
+        # print("target", target[:, 0])
+        l = torch.where(torch.isnan(target[:, 0]), z2, self.loss(l, z2))
+        # print(l)
+        return l / torch.isnan(target[:, 0]).float().mean()
 
 class NanLoss(nn.Module):
     def __init__(self, loss, reduction):
@@ -407,12 +407,28 @@ class NanLoss(nn.Module):
         l = self.loss(x, target)
         z = torch.zeros_like(target, dtype=torch.float32)
         # print(l)
-        return torch.where(torch.isnan(target), z, l)
+        nan_ratio = torch.where(torch.isnan(target), z, torch.ones_like(target, dtype=torch.float32)).mean().detach()
+        return torch.where(torch.isnan(target), z, l)  / nan_ratio
+        # print(l)
+        return l
+
+class BinaryLoss(nn.Module):
+    def __init__(self, loss, reduction):
+        super().__init__()
+        self.loss = loss(reduction=reduction)
+    def __repr__(self):
+        return self.loss.__class__.__name__
+    def forward(self, x, target):
+        l = self.loss(x, target.clamp(0, 1))
+        z = torch.zeros_like(target, dtype=torch.float32)
+        # print(l)
+        nan_ratio = torch.where(target < 0, z, torch.ones_like(target, dtype=torch.float32)).mean().detach()
+        return torch.where(target < 0, z, l)  / nan_ratio
         # print(l)
         return l
 
 class MultiHead(nn.Module):
-    def __init__(self, n_input, *n_targets, n_layers=1, n_hidden=128, activation=torch.nn.ReLU):
+    def __init__(self, n_input, *n_targets, n_layers=1, n_hidden=128, use_bn=True, activation=torch.nn.ReLU):
         super().__init__()
         if n_layers == 1:
             self.heads = torch.nn.ModuleList(
@@ -421,7 +437,17 @@ class MultiHead(nn.Module):
                 ]
             )
         else:
-            self.heads = torch.nn.ModuleList(
+            if use_bn:
+                self.heads = torch.nn.ModuleList(
+                    [
+                        torch.nn.Sequential(
+                            *sum([[torch.nn.Linear(n_input if l == 0 else n_hidden, n_hidden), torch.nn.BatchNorm1d(n_hidden), activation()] for l in range(n_layers-1)], []),
+                            torch.nn.Linear(n_hidden, n_output)
+                        ) for n_output in n_targets
+                    ]
+                )
+            else:
+                self.heads = torch.nn.ModuleList(
                 [
                     torch.nn.Sequential(
                         *sum([[torch.nn.Linear(n_input if l == 0 else n_hidden, n_hidden), activation()] for l in range(n_layers-1)], []),
@@ -472,7 +498,7 @@ class MultiHeadLoss(nn.Module):
                 self.running_means = current
             else:
                 #alpha = 1.0 / torch.sqrt(self.t)
-                alpha = 1.0 / (self.t ** 2)
+                alpha = 1.0 / (self.t ** 1.5)
                 self.running_means = (1 - alpha) * self.running_means + alpha * current
             self.t += 1.0
             if self.t% 100 == 99:
