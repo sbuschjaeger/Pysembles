@@ -139,6 +139,9 @@ class Autoencoder(SKLearnModel):
 
         self.X_ = X
 
+        # We have to set this variable to make the auto-encoder SKLEarn compatible
+        self.y_ = None
+
         optimizer = self.optimizer_method(self.parameters(), **self.optimizer)
         
         if self.scheduler_method is not None:
@@ -222,7 +225,11 @@ class Autoencoder(SKLearnModel):
             
             if self.out_path is not None:
                 outfile.write("{},{}\n".format(epoch, epoch_loss/example_cnt))
-        
+    
+    # For convenience we override predict and use predict_proba. 
+    def predict(self, X, eval_mode=True):
+        return self.predict_proba(X,eval_mode)
+
     def forward(self, x):
         if self.training:
             # for i,l in enumerate(self.layers_):

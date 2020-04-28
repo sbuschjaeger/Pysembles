@@ -75,11 +75,16 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
         torch.save(shallow_copy, os.path.join(out_path, name + ".pickle"))
         store_model(self, "{}/{}.onnx".format(out_path, name), dim, verbose=self.verbose)
 
-    def predict_proba(self, X):
+    def predict_proba(self, X, eval_mode=True):
         # print("pred proba", X.shape)
         check_is_fitted(self, ['X_', 'y_'])
         before_eval = self.training
-        self.eval()
+        
+        if eval_mode:
+            self.eval()
+        else:
+            self.train()
+
         self.cuda()
         with torch.no_grad(): 
             if self.pipeline:
@@ -90,9 +95,9 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
         self.train(before_eval)
         return ret_val
 
-    def predict(self, X):
+    def predict(self, X, eval_mode=True):
         # print("pred", X.shape)
-        pred = self.predict_proba(X)
+        pred = self.predict_proba(X, eval_mode)
         return np.argmax(pred, axis=1)
 
 class SKEnsemble(SKLearnBaseModel):
