@@ -308,11 +308,14 @@ class Clippy(torch.optim.Adam):
 
 # SOME HELPFUL LAYERS
 class Flatten(nn.Module):
-    def __init__(self, *args):
+    def __init__(self, store_shape=False):
         super(Flatten, self).__init__()
-        self.shape = args
+        self.store_shape = store_shape
 
     def forward(self, x):
+        if self.store_shape:
+            self.shape = x.shape
+
         return x.flatten(1)
         #return x.view(x.size(0), -1)
 
