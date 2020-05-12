@@ -123,8 +123,8 @@ class Autoencoder(SKLearnModel):
         self.encoder = self.layers_[0:len(tmp_enc)]
 
     def fit(self, X, y = None, sample_weight = None):
-        if y is not None:
-            raise ValueError("The autoencoder should not receive any labels!") 
+        # if y is not None:
+        #     raise ValueError("The autoencoder should not receive any labels!") 
 
         x_tensor = torch.tensor(X)
 
