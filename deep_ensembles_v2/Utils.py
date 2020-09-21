@@ -1,18 +1,21 @@
-from collections import OrderedDict
+# from collections import OrderedDict
 from functools import partial
 import inspect
 import warnings
 
 import numpy as np
+import copy 
 
 import torch
 from torch import nn
-from torch.utils.data import Dataset, TensorDataset
-from torch.autograd import Variable
-from torch.optim.optimizer import Optimizer, required
+from torch.utils.data import Dataset
+# from torch.autograd import Variable
+# from torch.optim.optimizer import Optimizer, required
 
 import torchvision
 import torchvision.transforms as transforms
+
+from .BinarisedNeuralNetworks import binarize, BinaryTanh, BinaryLinear, BinaryConv2d
 
 def flatten_dict(d):
     flat_dict = {}
@@ -42,39 +45,77 @@ def replace_objects(d):
 def dict_to_str(d):
     return str(replace_objects(d)).replace(":","=").replace(",","_").replace("\"","").replace("\'","").replace("{","").replace("}","").replace(" ", "")
 
-# def store_model(model, path, dim, verbose = False):
-#     dummy_input = torch.randn((1,*dim), device="cuda")
+def replace_layer_if_possible(layer):
+    class Sign(nn.Module):
+        def __init__(self):
+            super(Sign, self).__init__()
 
-#     class Sign(nn.Module):
-#         def __init__(self):
-#             super(Sign, self).__init__()
-
-#         def forward(self, input):
-#             return torch.where(input > 0, torch.tensor([1.0]).cuda(), torch.tensor([-1.0]).cuda())
-
-#     new_modules = OrderedDict()
-#     for m_name, m in model._modules.items():
-#         if isinstance(m, BinaryTanh):
-#             new_modules[m_name] = Sign()
-#         elif isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d)):
-#             new_modules[m_name] = m
-#         elif isinstance(m, BinaryLinear):
-#             new_modules[m_name] = nn.Linear(m.in_features, m.out_features, hasattr(m, 'bias'))
-            
-#             if (hasattr(m, 'bias')):
-#                 new_modules[m_name].weight.bias = binarize(m.bias).data
-#             new_modules[m_name].weight.data = binarize(m.weight).data
-#         elif isinstance(m, BinaryConv2d):
-#             new_modules[m_name] = nn.Conv2d(m.in_channels, m.out_channels, m.kernel_size, m.stride, m.padding, m.dilation, m.groups, hasattr(m, 'bias'), m.padding_mode)
-#             if (hasattr(m, 'bias')):
-#                 new_modules[m_name].weight.bias = binarize(m.bias).data
-#             new_modules[m_name].weight.data = binarize(m.weight).data
-#         else:
-#             new_modules[m_name] = m
+        def forward(self, input):
+            return torch.where(input > 0, torch.tensor([1.0]).cuda(), torch.tensor([-1.0]).cuda())
     
-#     with warnings.catch_warnings():
-#         warnings.simplefilter("ignore")
-#         torch.onnx.export(nn.Sequential(new_modules).cuda(), dummy_input, path, verbose=verbose, input_names=["input"], output_names=["output"])
+    print("FOUND ", layer)
+    if isinstance(layer, BinaryTanh):
+        print("REPLACING BINARY TANH")
+        new_layer = Sign()
+    elif isinstance(layer, BinaryLinear):
+        print("REPLACING LIN LAYER")
+        new_layer = nn.Linear(layer.in_features, layer.out_features, hasattr(layer, 'bias'))
+        if hasattr(layer, 'bias'):
+            new_layer.bias.data = binarize(layer.bias).data
+        new_layer.weight.data = binarize(layer.weight).data
+    elif isinstance(layer, BinaryConv2d):
+        print("REPLACING CONV LAYER")
+        new_layer = nn.Conv2d(
+            layer.in_channels, layer.out_channels, layer.kernel_size, 
+            layer.stride, layer.padding, layer.dilation, layer.groups, 
+            hasattr(layer, 'bias'), layer.padding_mode
+        )
+        if hasattr(layer, 'bias'):
+            new_layer.bias.data = binarize(layer.bias).data
+        new_layer.weight.data = binarize(layer.weight).data
+    else:
+        new_layer = layer
+    return new_layer
+
+def replace_sequential_if_possible(s):
+    for i,si in enumerate(s):
+        print("CHECKING ", si)
+        if hasattr(s[i], "layers_"):
+            print("LAYERS_ FOUND, REPLACING")
+            s[i].layers_ = replace_sequential_if_possible(s[i].layers_)
+        if isinstance(s[i], nn.Sequential):
+            print("SEQUENTIAL FOUND; REPLACING")
+            s[i] = replace_sequential_if_possible(s[i])
+        else:
+            print("REGULAR LAYER FOUND")
+            s[i] = replace_layer_if_possible(s[i])
+        # new_seq.append(tmp)
+    return s
+
+def store_model(model, path, dim, verbose = False):
+    # Since we change layers in-place we copy it beforehand
+    model = copy.deepcopy(model)
+    print("BEFORE REPLACE:", model)
+
+    model.layers_ = replace_sequential_if_possible(model.layers_)
+    # for i in range(len(model.layers_)):
+    #     model.layers_[i] = replace_layer_if_possible(model.layers_[i])
+
+    #new_modules = OrderedDict()
+    #for m_name, m in model._modules.items():
+    # for m in model.modules():
+    #     #new_modules[m_name] = replace_if_possible(m)
+    #     if isinstance(m, nn.Sequential):
+    #         m = replace_sequential_if_possible(m)
+    #     else:
+    #         m = replace_layer_if_possible(m)
+    #     #m = replace_if_possible(m)
+    
+    print("AFTER REPLACE:", model)
+    dummy_input = torch.randn((1,*dim), device="cuda")
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        torch.onnx.export(model.cuda(), dummy_input, path, verbose=verbose, input_names=["input"], output_names=["output"])
 
 # See: https://github.com/pytorch/pytorch/issues/19037
 def cov(x, rowvar=False, bias=False, ddof=None, aweights=None):
@@ -205,12 +246,19 @@ def weighted_lukas_loss(prediction, target, weights = None):
 def apply_in_batches(model, X, batch_size = 128):
     y_pred = None
     x_tensor = torch.tensor(X)
-    x_tensor = x_tensor.cuda()
     
-    dataset = torch.utils.data.TensorDataset(x_tensor)
+    if hasattr(model, "transformer") and model.transformer is not None:
+        test_transformer =  transforms.Compose([
+                torchvision.transforms.ToPILImage(),
+                transforms.ToTensor() 
+        ])
+    else:
+        test_transformer = None
+    
+    dataset = TransformTensorDataset(x_tensor,transform=test_transformer)
     train_loader = torch.utils.data.DataLoader(dataset, batch_size = batch_size)
-    for batch in train_loader:
-        data = batch[0].cuda()
+    for data in train_loader:
+        data = data.cuda()
         pred = model(data)
         pred = pred.cpu().detach().numpy()
         if y_pred is None:
@@ -223,22 +271,28 @@ def apply_in_batches(model, X, batch_size = 128):
 class TransformTensorDataset(Dataset):
     """TensorDataset with support of transforms.
     """
-    def __init__(self, x_tensor, y_tensor, transform=None):
+    def __init__(self, x_tensor, y_tensor = None, w_tensor = None, transform=None):
         self.x = x_tensor
         self.y = y_tensor
+        self.w = w_tensor
         self.transform = transform
 
     def __getitem__(self, index):
         x = self.x[index]
-        y = self.y[index]
 
         if self.transform is not None:
-            # TODO Refactor this, so that is automatically converts to pytorch tensors before calling ToPILImage 
-            pil_transformer = torchvision.transforms.ToPILImage()
-            x = pil_transformer(x)
             x = self.transform(x)
+        
+        if self.w is not None:
+            y = self.y[index]
+            w = self.w[index]
+            return x, y, w
+        elif self.y is not None:
+            y = self.y[index]
 
-        return x, y
+            return x, y
+        else:
+            return x
 
     def __len__(self):
         return self.x.size(0)
@@ -254,11 +308,14 @@ class Clippy(torch.optim.Adam):
 
 # SOME HELPFUL LAYERS
 class Flatten(nn.Module):
-    def __init__(self, *args):
+    def __init__(self, store_shape=False):
         super(Flatten, self).__init__()
-        self.shape = args
+        self.store_shape = store_shape
 
     def forward(self, x):
+        if self.store_shape:
+            self.shape = x.shape
+
         return x.flatten(1)
         #return x.view(x.size(0), -1)
 
@@ -278,3 +335,13 @@ class Scale(nn.Module):
 
     def forward(self, input):
         return input * self.scale
+
+class SkipConnection(nn.Module):
+    def __init__(self, *block):
+        super().__init__()
+        self.layers_ = torch.nn.Sequential(*block)
+    
+    def forward(self, x):
+        y = self.layers_(x)
+        assert x.shape == y.shape
+        return x + y

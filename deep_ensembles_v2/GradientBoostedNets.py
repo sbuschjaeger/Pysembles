@@ -16,7 +16,7 @@ from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import accuracy_score
 
-from Models import SKEnsemble 
+from .Models import SKEnsemble 
 
 class GradientBoostedNets(SKEnsemble):
     def __init__(self, optimizer_dict, scheduler_dict, loss_function, base_estimator,
