@@ -8,7 +8,7 @@ from sklearn.utils.multiclass import unique_labels
 
 from Models import SKLearnModel
 from Models import StagedEnsemble
-from BinarisedNeuralNetworks import BinaryConv2d
+from BinarisedNeuralNetworks import BinaryConv2d, BinaryLinear
 
 import copy
 
@@ -33,11 +33,10 @@ class BaggingClassifier(StagedEnsemble):
         
         if self.freeze_layers:
             for e in self.estimators_:
-                for l in e.layers_[:-1]:
-                    # 
-                    l.requires_grad = False
-                    # if isinstance(l, (nn.Conv1d, nn.Conv2d, nn.Conv3d, BinaryConv2d)):
-                    #     l.requires_grad = False
+                for l in e.layers_:
+                    # l.requires_grad = False
+                    if isinstance(l, (nn.Conv1d, nn.Conv2d, nn.Conv3d, BinaryConv2d, nn.Linear, BinaryLinear)):
+                        l.requires_grad = False
 
         for idx, est in enumerate(self.estimators_):
             if self.seed is not None:

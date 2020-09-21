@@ -210,7 +210,7 @@ class SKLearnModel(SKLearnBaseModel):
                     )
                     pbar.set_description(desc)
             
-                if self.x_test is not None and epoch % self.eval_test == 0:
+                if self.x_test is not None and self.eval_test > 0 and epoch % self.eval_test == 0:
                     # output = apply_in_batches(self, self.x_test)
                     # accuracy_test = accuracy_score(np.argmax(output, axis=1),self.y_test)*100.0
 
@@ -241,7 +241,7 @@ class SKLearnModel(SKLearnBaseModel):
                 accuracy = 100.0*n_correct/example_cnt
 
                 if self.x_test is not None:
-                    if epoch % self.eval_test == 0:
+                    if self.eval_test > 0 and epoch % self.eval_test == 0:
                         output = apply_in_batches(self, self.x_test, batch_size = self.batch_size)
                         accuracy_test = accuracy_score(np.argmax(output, axis=1),self.y_test)*100.0
                     else:
