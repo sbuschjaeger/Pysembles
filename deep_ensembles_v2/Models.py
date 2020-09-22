@@ -104,8 +104,14 @@ class SKEnsemble(SKLearnBaseModel):
     def forward(self, X):
         return self.forward_with_base(X)[0]
 
+    # @torch.jit.script
     def forward_with_base(self, X):
-        base_preds = [self.estimators_[i](X) for i in range(self.n_estimators)]
+        # base_preds = []
+        # for i in torch.range(start=0,end=5):
+        #     base_preds.append(self.estimators_[i](X)) 
+
+        # # base_preds = [self.estimators_[i](X) for i in torch.range(self.n_estimators)] #self.n_estimators
+        base_preds = [e(X) for e in self.estimators_] #self.n_estimators
         pred_combined = 1.0/self.n_estimators*torch.sum(torch.stack(base_preds, dim=1),dim=1)
         return pred_combined, base_preds
 

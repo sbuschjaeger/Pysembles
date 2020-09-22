@@ -4,13 +4,13 @@ from torch.utils.cpp_extension import BuildExtension, CUDAExtension, CUDA_HOME
 modules= []
 
 # TODO WE ASSUME THAT CUDA IS AVAILABLE 
-if CUDA_HOME:
-    modules.append(
-        CUDAExtension('binarization', [
-                  'deep_ensembles_v2/cuda/binarization/binarization.cpp',
-                  'deep_ensembles_v2/cuda/binarization/binarize_cuda.cu',
-            ]),
-    )
+# if CUDA_HOME:
+modules.append(
+      CUDAExtension('binarization', [
+            'deep_ensembles_v2/cuda/binarization/binarization.cpp',
+            'deep_ensembles_v2/cuda/binarization/binarize_cuda.cu',
+      ]),
+)
 
 setup(name='deep_ensembles_v2',
       version='0.1',
