@@ -11,24 +11,47 @@ from torch.autograd import Function
 
 from torch.nn.modules.utils import _pair, _quadruple
 
-class BinarizeF(Function):
-    @staticmethod
-    def forward(ctx, input):
-        #input = input.clamp(-1,+1)
-        #ctx.save_for_backward(input)
-        output = input.new(input.size())
-        output[input > 0] = 1
-        output[input <= 0] = -1
-        return output
+import binarization
 
-    @staticmethod
-    def backward(ctx, grad_output):
-        #return grad_output, None
-        grad_input = grad_output.clone()
-        return grad_input#, None
+def binarize_to_plusminus1(input):
+    input_shape = list(input.shape)
+    len_input_shape = len(input_shape)
 
-# aliases
-binarize = BinarizeF.apply
+    if len_input_shape == 4:
+        input = input.view(input_shape[0], input_shape[1], -1)
+    if len_input_shape == 3:
+        input = input.view(input_shape[0], input_shape[1], input_shape[2])
+    if len_input_shape == 2:
+        input = input.view(input_shape[0], input_shape[1], 1)
+    if len_input_shape == 1:
+        input = input.view(input_shape[0], 1, 1)
+
+    input = binarization.binarization(input)
+    input = input[0]
+    input = input.view(input_shape)
+
+    return input
+
+binarize = binarize_to_plusminus1
+
+# class BinarizeF(Function):
+#     @staticmethod
+#     def forward(ctx, input):
+#         #input = input.clamp(-1,+1)
+#         #ctx.save_for_backward(input)
+#         output = input.new(input.size())
+#         output[input > 0] = 1
+#         output[input <= 0] = -1
+#         return output
+
+#     @staticmethod
+#     def backward(ctx, grad_output):
+#         #return grad_output, None
+#         grad_input = grad_output.clone()
+#         return grad_input#, None
+
+# # aliases
+# binarize = BinarizeF.apply
 
 class BinaryTanh(nn.Module):
     def __init__(self, *args, **kwargs):

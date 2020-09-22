@@ -247,13 +247,18 @@ def apply_in_batches(model, X, batch_size = 128):
     y_pred = None
     x_tensor = torch.tensor(X)
     
-    if hasattr(model, "transformer") and model.transformer is not None:
-        test_transformer =  transforms.Compose([
-                torchvision.transforms.ToPILImage(),
-                transforms.ToTensor() 
-        ])
-    else:
-        test_transformer = None
+    # At some point during development we had problems with inconsistend 
+    # data types and data interpretations and therefore we introduced a teansformer for
+    # both, testing and training. It seems that PyTorch got this sorted now and 
+    # thus we do not need it anymore?
+    # if hasattr(model, "transformer") and model.transformer is not None:
+    #     test_transformer =  None 
+    #     # transforms.Compose([
+    #     #     transforms.ToPILImage(),
+    #     #     transforms.ToTensor() 
+    #     # ])
+    # else:
+    #     test_transformer = None
     
     dataset = TransformTensorDataset(x_tensor,transform=test_transformer)
     train_loader = torch.utils.data.DataLoader(dataset, batch_size = batch_size)
