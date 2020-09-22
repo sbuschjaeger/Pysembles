@@ -1,2 +1,6 @@
 __pycache__
 *.egg-info
+binarization.cpython-37m-x86_64-linux-gnu.so
+build/lib.linux-x86_64-3.7/binarization.cpython-37m-x86_64-linux-gnu.so
+build/temp.linux-x86_64-3.7/deep_ensembles_v2/cuda/binarization/binarization.o
+build/temp.linux-x86_64-3.7/deep_ensembles_v2/cuda/binarization/binarize_cuda.o

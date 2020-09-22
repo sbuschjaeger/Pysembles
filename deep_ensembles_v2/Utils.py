@@ -259,6 +259,7 @@ def apply_in_batches(model, X, batch_size = 128):
     #     # ])
     # else:
     #     test_transformer = None
+    test_transformer = None
     
     dataset = TransformTensorDataset(x_tensor,transform=test_transformer)
     train_loader = torch.utils.data.DataLoader(dataset, batch_size = batch_size)
