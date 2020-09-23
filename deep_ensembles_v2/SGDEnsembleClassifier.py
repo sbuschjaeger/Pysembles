@@ -112,7 +112,7 @@ class SGDEnsembleClassifier(SKEnsemble):
 
                     pbar.set_description(desc)
                 
-                if self.x_test is not None and self.eval_test is not None and self.eval_test > 0:
+                if self.x_test is not None and self.eval_test is not None and self.eval_test > 0 and epoch % self.eval_test == 0:
                     output = apply_in_batches(self, self.x_test, batch_size = self.batch_size)
                     accuracy_test_apply = accuracy_score(np.argmax(output, axis=1),self.y_test)*100.0
 
@@ -146,7 +146,7 @@ class SGDEnsembleClassifier(SKEnsemble):
             torch.cuda.empty_cache()
             
             if self.out_path is not None:
-                if self.x_test is not None and self.eval_test is not None and self.eval_test > 0:
+                if self.x_test is not None and self.eval_test is not None and self.eval_test > 0 and epoch % self.eval_test == 0:
                     output= self.predict_proba(self.x_test)
                     # output = apply_in_batches(self, self.x_test)
                     accuracy_test = accuracy_score(np.argmax(output, axis=1),self.y_test)*100.0
