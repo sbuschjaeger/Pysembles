@@ -17,8 +17,7 @@
 
 template <typename scalar_t>
 __global__ void binarize_kernel(
-    torch::PackedTensorAccessor<scalar_t,3,torch::RestrictPtrTraits,size_t> input
-  ) {
+    torch::PackedTensorAccessor<scalar_t,3,torch::RestrictPtrTraits,size_t> input) {
 
   // handle access indices
   const int c = blockIdx.x * blockDim.x + threadIdx.x;
@@ -28,20 +27,16 @@ __global__ void binarize_kernel(
   // Python version
   //output[input > 0] = 1
   //output[input <= 0] = -1
-
-  if (input[c][d][e] > 0)
-  {
-    input[c][d][e] = 1;
-  }
-  else
-  {
-    input[c][d][e] = -1;
-  }
+    if ((c < input.size(0)) && (d < input.size(1)) && (e < input.size(2))) {
+        if (input[c][d][e] > 0) {
+            input[c][d][e] = 1;
+        } else {
+            input[c][d][e] = -1;
+        }
+    }
 }
 
-std::vector<torch::Tensor> binarize_cuda(
-  torch::Tensor input
-) {
+std::vector<torch::Tensor> binarize_cuda(torch::Tensor input) {
   // The number of thread blocks in a grid is usually dictated by the size of the data being processed, which typically exceeds the number of processors in the system.
   // dim3 threadsPerBlock(8,8,8)
   // <<<number of blocks per grid, number of threads ber block>>>

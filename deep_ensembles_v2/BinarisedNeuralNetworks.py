@@ -26,13 +26,32 @@ def binarize_to_plusminus1(input):
     if len_input_shape == 1:
         input = input.view(input_shape[0], 1, 1)
 
-    input = binarization.binarization(input)
-    input = input[0]
-    input = input.view(input_shape)
+    inputL = binarization.binarization(input)
+    input = inputL[0].view(input_shape)
 
     return input
 
-binarize = binarize_to_plusminus1
+class BinarizeF(Function):
+    @staticmethod
+    def forward(ctx, input, flip_prob = None):
+        #input = input.clamp(-1,+1)
+        #ctx.save_for_backward(input)
+        output = input.clone()
+        #print("BEFORE:", output)
+        output = binarize_to_plusminus1(output)
+        #print("AFTER:", output)
+        # if flip_prob is not None:
+        # output = fi_binarized_float_plusminus1(output, flip_prob, flip_prob)
+        return output
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        #return grad_output, None
+        grad_input = grad_output.clone()
+        return grad_input, None
+
+# aliases
+binarize = BinarizeF.apply
 
 # class BinarizeF(Function):
 #     @staticmethod
