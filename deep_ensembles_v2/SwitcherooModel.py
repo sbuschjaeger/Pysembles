@@ -13,6 +13,7 @@ from Models import SKLearnModel
 
 from BinarisedNeuralNetworks import binarize, BinaryTanh, BinaryLinear, BinaryConv2d
 
+# TODO THIS CLASSIFIER NEEDS TO BE UPDATED
 class SwitcherooModel(SKLearnModel):
     def __init__(self, switch_epoch, *args, **kwargs):
         super().__init__(*args, **kwargs)

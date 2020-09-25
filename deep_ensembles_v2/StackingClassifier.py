@@ -19,6 +19,8 @@ from .Models import SKLearnModel
 from .BinarisedNeuralNetworks import BinaryTanh
 from .BinarisedNeuralNetworks import BinaryLinear
 
+
+# TODO THIS CLASSIFIER NEEDS TO BE UPDATED
 class StackingClassifier(SKLearnModel):
     def __init__(self, optimizer_dict, scheduler_dict, loss_function, base_estimator,verbose = True, out_path = None,  n_estimators = 5, l_reg = 0):
         super().__init__(optimizer_dict, scheduler_dict, loss_function, base_estimator, verbose, out_path)

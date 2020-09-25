@@ -41,14 +41,20 @@ class GradientBoostedNets(SKEnsemble):
         
         self.estimators_ = [self.base_estimator() for _ in range(self.n_estimators)]
 
-        self.X_ = X
-        self.y_ = y
-
         x_tensor = torch.tensor(X)
         y_tensor = torch.tensor(y)
         y_tensor = y_tensor.type(torch.LongTensor) 
+        if sample_weight is not None:
+            sample_weight = len(y)*sample_weight/np.sum(sample_weight)
+            w_tensor = torch.tensor(sample_weight)
+            w_tensor = w_tensor.type(torch.FloatTensor)
+            data = TransformTensorDataset(x_tensor,y_tensor,w_tensor,transform=self.transformer)
+        else:
+            w_tensor = None
+            data = TransformTensorDataset(x_tensor,y_tensor,transform=self.transformer)
 
-        data = torch.utils.data.TensorDataset(x_tensor,y_tensor)
+        self.X_ = X
+        self.y_ = y
 
         optimizers = [
             self.optimizer_dict["method"](self.estimators_[i].parameters(), **self.optimizer_dict["config"]) 
@@ -95,6 +101,11 @@ class GradientBoostedNets(SKEnsemble):
                         data, target = Variable(data), Variable(target)
                         optimizers[i].zero_grad()
                         
+                        if sample_weight is not None:
+                            weights = batch[2]
+                            weights = weights.cuda()
+                            weights = Variable(weights)
+
                         if i > 0:
                             base_preds = [1.0/self.n_estimators*est(data) for est in self.estimators_[0:i]]
                             pred_combined = torch.sum(torch.stack(base_preds, dim=1),dim=1).detach() 
@@ -107,6 +118,9 @@ class GradientBoostedNets(SKEnsemble):
                         total_loss += loss.sum().item()
                         n_correct += accuracy.sum().item()
                             
+                        if sample_weight is not None:
+                            loss = loss * weights
+                        
                         if self.l_reg > 0:
                             if self.reg_type == "cbound":
                                 #loss += self.l_reg*self.cbound(data,target)
@@ -118,9 +132,9 @@ class GradientBoostedNets(SKEnsemble):
                                 regularizer = torch.tensor(0)
 
                             total_reg += regularizer.item()
-                            loss = self.l_reg * regularizer + loss.mean()
-                        else:
-                            loss = loss.mean()
+                            loss += self.l_reg * regularizer 
+                        
+                        loss = loss.mean()
 
                         loss.backward()
                         optimizers[i].step()

@@ -101,6 +101,10 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
         return np.argmax(pred, axis=1)
 
 class SKEnsemble(SKLearnBaseModel):
+    def __init__(self, combination_type = "average", *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.combination_type = combination_type
+
     def forward(self, X):
         return self.forward_with_base(X)[0]
 
@@ -112,8 +116,13 @@ class SKEnsemble(SKLearnBaseModel):
 
         # # base_preds = [self.estimators_[i](X) for i in torch.range(self.n_estimators)] #self.n_estimators
         base_preds = [e(X) for e in self.estimators_] #self.n_estimators
-        pred_combined = 1.0/self.n_estimators*torch.sum(torch.stack(base_preds, dim=1),dim=1)
-        return pred_combined, base_preds
+        if self.combination_type == "average":
+            pred_combined = 1.0/self.n_estimators*torch.sum(torch.stack(base_preds, dim=1),dim=1)
+            return pred_combined, base_preds
+        elif self.combination_type == "softmax":
+            pred_combined = 1.0/self.n_estimators*torch.sum(torch.stack(base_preds, dim=1),dim=1)
+            pred_combined = nn.functional.softmax(pred_combined,dim=1)
+            return pred_combined, base_preds
 
 class StagedEnsemble(SKEnsemble):
     # Assumes self.estimators_ and self.estimator_weights_ exists
@@ -149,6 +158,7 @@ class SKLearnModel(SKLearnBaseModel):
         self.n_classes_ = len(self.classes_)
         if self.pipeline:
             X = self.pipeline.fit_transform(X)
+            
         x_tensor = torch.tensor(X)
         y_tensor = torch.tensor(y)
         y_tensor = y_tensor.type(torch.LongTensor) 
@@ -205,7 +215,7 @@ class SKLearnModel(SKLearnBaseModel):
                     target = batch[1]
                     data, target = data.cuda(), target.cuda()
                     data, target = Variable(data), Variable(target)
-                    
+
                     if sample_weight is not None:
                         weights = batch[2]
                         weights = weights.cuda()
@@ -213,19 +223,15 @@ class SKLearnModel(SKLearnBaseModel):
 
                     optimizer.zero_grad()
                     output = self(data)
+                    
                     unweighted_acc = (output.argmax(1) == target).type(torch.cuda.FloatTensor)
+                    loss = self.loss_function(output, target)
                     if sample_weight is not None: 
-                        loss = self.loss_function(output, target, weights)
-                        epoch_loss += loss.sum().item()
-                        loss = loss.mean()
+                        loss = loss*weights
 
-                        weighted_acc = unweighted_acc*weights
-                        n_correct += weighted_acc.sum().item()
-                    else:
-                        loss = self.loss_function(output, target)
-                        epoch_loss += loss.sum().item()
-                        loss = loss.mean()
-                        n_correct += unweighted_acc.sum().item()
+                    epoch_loss += loss.sum().item()
+                    loss = loss.mean()
+                    n_correct += unweighted_acc.sum().item()
                     
                     loss.backward()
                     optimizer.step()
@@ -233,10 +239,6 @@ class SKLearnModel(SKLearnBaseModel):
                     pbar.update(data.shape[0])
                     example_cnt += data.shape[0]
                     batch_cnt += 1
-                    # print("")
-                    # print(self.layers_[-3].running_var)
-                    # print(self.layers_[-3].running_mean)
-                    # print("")
                     desc = '[{}/{}] loss {:2.4f} acc {:2.4f}'.format(
                         epoch, 
                         self.epochs-1, 
@@ -290,4 +292,11 @@ class SKLearnModel(SKLearnBaseModel):
                     outfile.write("{},{},{}\n".format(epoch, avg_loss, accuracy))
         
     def forward(self, x):
-        return self.layers_(x)
+        try:
+            return self.layers_(x)
+        except Exception as e:
+            for l in self.layers_:
+                x = l(x)
+                print(x.shape)
+            raise e
+        # return self.layers_(x)
