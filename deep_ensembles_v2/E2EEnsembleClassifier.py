@@ -17,27 +17,33 @@ from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import accuracy_score
 
 from .Models import SKEnsemble
-from .Utils import apply_in_batches, cov, weighted_mse_loss, weighted_squared_hinge_loss
+from .Utils import apply_in_batches, cov, TransformTensorDataset#, weighted_mse_loss, weighted_squared_hinge_loss
 
-class SGDEnsembleClassifier(SKEnsemble):
+class E2EEnsembleClassifier(SKEnsemble):
     def __init__(self, n_estimators = 5, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.n_estimators = n_estimators
 
-    def fit(self, X, y):
+    def fit(self, X, y, sample_weight = None):
         self.classes_ = unique_labels(y)
         self.n_classes_ = len(self.classes_)
-
         self.estimators_ = nn.ModuleList([ self.base_estimator() for _ in range(self.n_estimators)])
+        
+        x_tensor = torch.tensor(X)
+        y_tensor = torch.tensor(y)  
+
+        if sample_weight is not None:
+            sample_weight = len(y)*sample_weight/np.sum(sample_weight)
+            w_tensor = torch.tensor(sample_weight)
+            w_tensor = w_tensor.type(torch.FloatTensor)
+            data = TransformTensorDataset(x_tensor,y_tensor,w_tensor,transform=self.transformer)
+        else:
+            w_tensor = None
+            data = TransformTensorDataset(x_tensor,y_tensor,transform=self.transformer)
 
         self.X_ = X
         self.y_ = y
 
-        x_tensor = torch.tensor(X)
-        y_tensor = torch.tensor(y)  
-        y_tensor = y_tensor.type(torch.LongTensor) 
-
-        data = torch.utils.data.TensorDataset(x_tensor,y_tensor)
         optimizer = self.optimizer_method(self.parameters(), **self.optimizer)
         
         if self.scheduler_method is not None:
@@ -78,6 +84,11 @@ class SGDEnsembleClassifier(SKEnsemble):
                     data, target = data.cuda(), target.cuda()
                     data, target = Variable(data), Variable(target)
                     
+                    if sample_weight is not None:
+                        weights = batch[2]
+                        weights = weights.cuda()
+                        weights = Variable(weights)
+
                     optimizer.zero_grad()
                     f_bar, base_preds = self.forward_with_base(data)
                     
@@ -88,6 +99,9 @@ class SGDEnsembleClassifier(SKEnsemble):
 
                     accuracy = (f_bar.argmax(1) == target).type(torch.cuda.FloatTensor)
                     loss = self.loss_function(f_bar, target)
+                    if sample_weight is not None:
+                        loss = loss * weights
+                        
                     total_loss += loss.sum().item()
                     n_correct += accuracy.sum().item()
                     
@@ -95,7 +109,7 @@ class SGDEnsembleClassifier(SKEnsemble):
                     example_cnt += data.shape[0]
                     batch_cnt += 1
 
-                    loss = loss.mean() 
+                    loss = loss.sum() 
 
                     loss.backward()
                     optimizer.step()
@@ -104,10 +118,10 @@ class SGDEnsembleClassifier(SKEnsemble):
                         epoch, 
                         self.epochs-1, 
                         total_loss/example_cnt, 
-                        100. * n_correct/example_cnt,
-                        100. * np.mean(avg_n_correct)/(example_cnt),
-                        100. * min(avg_n_correct)/example_cnt,
-                        100. * max(avg_n_correct)/example_cnt
+                        100.0 * n_correct/example_cnt,
+                        100.0 * np.mean(avg_n_correct)/(example_cnt),
+                        100.0 * min(avg_n_correct)/example_cnt,
+                        100.0 * max(avg_n_correct)/example_cnt
                     )
 
                     pbar.set_description(desc)
@@ -129,10 +143,10 @@ class SGDEnsembleClassifier(SKEnsemble):
                         epoch, 
                         self.epochs-1, 
                         total_loss/example_cnt, 
-                        100. * n_correct/example_cnt,
-                        100. * np.mean(avg_n_correct)/(example_cnt),
-                        100. *min(avg_n_correct)/example_cnt,
-                        100. *max(avg_n_correct)/example_cnt,
+                        100.0 * n_correct/example_cnt,
+                        100.0 * np.mean(avg_n_correct)/(example_cnt),
+                        100.0 *min(avg_n_correct)/example_cnt,
+                        100.0 *max(avg_n_correct)/example_cnt,
                         accuracy_test_apply,
                         np.mean(all_accuracy_test), 
                         accuracy_test_proba
@@ -160,9 +174,9 @@ class SGDEnsembleClassifier(SKEnsemble):
                         epoch, 
                         total_loss/example_cnt, 
                         100.0 * n_correct/example_cnt, 
-                        100. * np.mean(avg_n_correct)/(example_cnt),
-                        100. *min(avg_n_correct)/example_cnt,
-                        100. *max(avg_n_correct)/example_cnt,
+                        100.0 * np.mean(avg_n_correct)/(example_cnt),
+                        100.0 *min(avg_n_correct)/example_cnt,
+                        100.0 *max(avg_n_correct)/example_cnt,
                         accuracy_test,
                         np.mean(all_accuracy_test)
                     )
@@ -171,9 +185,9 @@ class SGDEnsembleClassifier(SKEnsemble):
                         epoch, 
                         total_loss/example_cnt, 
                         100.0 * n_correct/example_cnt, 
-                        100. * np.mean(avg_n_correct)/(example_cnt),
-                        100. *min(avg_n_correct)/example_cnt,
-                        100. *max(avg_n_correct)/example_cnt,
+                        100.0 * np.mean(avg_n_correct)/(example_cnt),
+                        100.0 *min(avg_n_correct)/example_cnt,
+                        100.0 *max(avg_n_correct)/example_cnt,
                     )
                 outfile.write(o_str)
                 if epoch % 10 == 0:
