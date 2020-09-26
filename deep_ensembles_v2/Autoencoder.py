@@ -125,7 +125,6 @@ class Autoencoder(SKLearnModel):
     def fit(self, X, y = None, sample_weight = None):
         # if y is not None:
         #     raise ValueError("The autoencoder should not receive any labels!") 
-
         x_tensor = torch.tensor(X)
 
         if sample_weight is not None:
