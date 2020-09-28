@@ -20,9 +20,8 @@ from .BinarisedNeuralNetworks import BinaryTanh
 from .BinarisedNeuralNetworks import BinaryLinear
 
 class StackingClassifier(SKLearnModel):
-    def __init__(self, n_estimators, classifier, *args, **kwargs):
+    def __init__(self, classifier, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.n_estimators = n_estimators
         self.estimators_ = nn.ModuleList([ self.base_estimator() for _ in range(self.n_estimators)])
         self.classifier = classifier
         self.classifier_ = self.classifier()

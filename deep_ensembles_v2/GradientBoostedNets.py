@@ -21,7 +21,6 @@ from .Models import SKEnsemble
 class GradientBoostedNets(SKEnsemble):
     def __init__(self, n_estimators = 5, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.n_estimators = n_estimators
         self.estimators_ = nn.ModuleList([ self.base_estimator() for _ in range(self.n_estimators)])
         
         # Currently we only support average for this kind of training I guess. 

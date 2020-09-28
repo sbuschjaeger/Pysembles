@@ -165,6 +165,23 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
                         weights = None
 
                     optimizer.zero_grad()
+
+                    # We assume that prepare_backward computes the appropriate loss and possible some statistics 
+                    # the user wants to store / output. To do so, prepare_backward should return a dictionary with 
+                    # three fields. An example is given below. Note that the prediction / loss / metrics should be
+                    # given for each individual example in the batch. 
+                    #    !!!! Do not reduce / sum / mean the loss etc manually !!!!
+                    # This is done afterwards in this code. 
+                    #
+                    # d = {
+                    #     "prediction" : self(data), 
+                    #     "backward" : self.loss_function(self(data), target), 
+                    #     "metrics" :
+                    #     {
+                    #         "loss" : self.loss_function(self(data), target),
+                    #         "accuracy" : 100.0*(self(data).argmax(1) == target).type(torch.cuda.FloatTensor)
+                    #     } 
+                    # }
                     backward = self.prepare_backward(data, target, weights)
                     
                     for key,val in backward["metrics"].items():
@@ -231,9 +248,13 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
                     outfile.write(out_file_content)
 
 class SKEnsemble(SKLearnBaseModel):
-    def __init__(self, combination_type = "average", *args, **kwargs):
+    def __init__(self, n_estimators = 5, combination_type = "average", *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.combination_type = combination_type
+        self.n_estimators = n_estimators
+        
+        assert self.n_estimators > 0, "Your ensemble should have at-least one member, but self.n_estimators was {}".format(self.n_estimators)
+        assert self.combination_type  in ('average', 'softmax', 'best'), "Combination type must be one of ('average', 'softmax', 'best')"
 
     def forward(self, X):
         return self.forward_with_base(X)[0]
@@ -248,13 +269,13 @@ class SKEnsemble(SKLearnBaseModel):
         base_preds = [e(X) for e in self.estimators_] #self.n_estimators
         if self.combination_type == "average":
             pred_combined = 1.0/self.n_estimators*torch.sum(torch.stack(base_preds, dim=1),dim=1)
-            return pred_combined, base_preds
         elif self.combination_type == "softmax":
             pred_combined = 1.0/self.n_estimators*torch.sum(torch.stack(base_preds, dim=1),dim=1)
             pred_combined = nn.functional.softmax(pred_combined,dim=1)
-            return pred_combined, base_preds
-        else: 
-            raise ValueError("self.combination_type should either be 'average' or 'softmax'")
+        else:   
+            pred_combined, _ =torch.stack(base_preds, dim=1).max(dim=1)
+        
+        return pred_combined, base_preds
 
     # Assumes self.estimators_ and self.estimator_weights_ exists
     def staged_predict_proba(self, X):

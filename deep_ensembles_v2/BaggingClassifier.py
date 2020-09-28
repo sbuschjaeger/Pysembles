@@ -17,9 +17,31 @@ from .BinarisedNeuralNetworks import BinaryConv2d, BinaryLinear
 import copy
 
 class BaggingClassifier(SKEnsemble):
-    def __init__(self, n_estimators = 5, bootstrap = True, frac_examples = 1.0, freeze_layers = None, train_method = "fast", *args, **kwargs):
+    """ Classic Bagging in the modern world of Deep Learning. 
+
+    Bagging uses different subsets of features / training points to train an ensemble of classifiers. The classic version of Bagging uses bootstrap samples which means that each base learner roughly receives 63% of the training data, whereas roughly 37% of the training data are duplicates. This lets each base model slightly overfit to their respective portion of the training data leading to a somewhat diverse ensemble. 
+
+    This implementation supports a few variations of bagging. Similar to SKLearn you can choose the fraction of samples with and without bootstrapping. Moreover, you can freeze all but the last layer of each base model. This simulates a form of feature sampling / feature extraction, and should be expanded in the future. Last, there is a "fast" training method which jointly trains the ensemble using poisson weights for each individual classifier. 
+
+    Attributes:
+        n_estimators (int): Number of estimators in ensemble. Should be at least 1
+        bootstrap (bool): If true, sampling is performed with replacement. If false, sampling is performed without replacement
+        frac_examples (float): Fraction of training examples used per base learner, that is N_base = (int) N * self.frac_examples if N is the number of training data points. 
+            Must be from (0,1].
+        freeze_layers (bool): If true, all but the last layer of all base learners are frozen and _not_ fitted during training (requires_grad = False is set to false). 
+            This may simulate something similar to feature bagging
+        train_method (str): If set to "fast" a (arguably) faster training method is used. 
+            "Fast" implements an online version of Bagging, which weights each example by sampling values from a Poisson distribution as proposed by Oza et al. in 2001. A similar approach called Wagging has also been evaluated by Webb in 2000 in the context (batch) decision tree learning.
+            This online approach to Bagging can be faster for smaller base models which do not utilize the entire GPU. The reason for this is, that CUDA calls are evaluated asynchronous leading to a better overall utilization of the GPU if multiple. Moreover, we can directly monitor the overall ensemble loss which is nice. 
+            The other method (anything where train_method != "fast") is the "regular" bagging-style training approach in which we simply call each fit method individually. This trains one model after another which might be faster if the base models are already quite large and fully utilize the GPU. NOTE: The fast method currently does not support frac_examples and ignores this parameter
+
+    References:
+    - Breiman, L. (1996). Bagging predictors. Machine Learning. https://doi.org/10.1007/bf00058655
+    - Webb, G. I. (2000). MultiBoosting: a technique for combining boosting and wagging. Machine Learning. https://doi.org/10.1023/A:1007659514849
+    - Oza, N. C., & Russell, S. (2001). Online Bagging and Boosting. Retrieved from https://ti.arc.nasa.gov/m/profile/oza/files/ozru01a.pdf 
+    """
+    def __init__(self, bootstrap = True, frac_examples = 1.0, freeze_layers = None, train_method = "fast", *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.n_estimators = n_estimators
         self.frac_samples = frac_examples
         self.bootstrap = bootstrap
         self.freeze_layers = freeze_layers
@@ -28,7 +50,10 @@ class BaggingClassifier(SKEnsemble):
             SKLearnModel(training_file="training_{}.jsonl".format(i), *args, **kwargs) for i in range(self.n_estimators)
         ])
 
+        assert self.frac_examples > 0 and self.frac_samples <= 1.0, "frac_examples expects the fraction of samples used, this must be between (0,1]. It was {}".format(self.frac_examples)
+
     def prepare_backward(self, data, target, weights = None):
+        # TODO WHAT ABOUT frac_examples?
         f_bar, base_preds = self.forward_with_base(data)
 
         accuracies = []
@@ -65,6 +90,8 @@ class BaggingClassifier(SKEnsemble):
         return d
 
     def fit(self, X, y): 
+        # TODO: INLCUDE SAMPLE_WEIGHTS!!!
+
         self.classes_ = unique_labels(y)
         if self.pipeline:
             X = self.pipeline.fit_transform(X)
@@ -75,16 +102,10 @@ class BaggingClassifier(SKEnsemble):
         if self.freeze_layers is not None:
             for e in self.estimators_:
                 for i, l in enumerate(e.layers_[:self.freeze_layers]):
-                    # print("Layer {} which is {} is now frozen".format(i,l))
-                    #if isinstance(l, (nn.Conv1d, nn.Conv2d, nn.Conv3d, BinaryConv2d, nn.Linear, BinaryLinear)):
                     for p in l.parameters():
                         p.requires_grad = False
         
-        # Check if we use the "fast" method for training. "Fast" copies the entire dataset multiple times and 
-        # calls the forward method for each batch manually for each base model. 
-        # The other method is the "regular" bagging-style training approach in which we simply call each
-        # fit method individually. This trains one model after another which does not fully utilize 
-        # the GPU for smaller base models, but might be faster if the base models are already quite large
+        # Check if we use the "fast" method for training. 
         if self.train_method != "fast":
             for idx, est in enumerate(self.estimators_):
                 if self.seed is not None:
