@@ -17,7 +17,7 @@ from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import accuracy_score
 
 from .Models import SKEnsemble
-from .Utils import apply_in_batches, cov, TransformTensorDataset#, weighted_mse_loss, weighted_squared_hinge_loss
+from .Utils import TransformTensorDataset#, weighted_mse_loss, weighted_squared_hinge_loss
 
 class E2EEnsembleClassifier(SKEnsemble):
     """ End-to-End (E2E) Learning of the entire ensemble by viewing it as a single model.

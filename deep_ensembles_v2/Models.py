@@ -13,7 +13,7 @@ from sklearn.utils.validation import check_is_fitted
 from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import accuracy_score
 
-from .Utils import apply_in_batches, store_model, TransformTensorDataset
+from .Utils import store_model, TransformTensorDataset, apply_in_batches
 
 class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
     def __init__(self, optimizer, scheduler, loss_function, 
@@ -86,14 +86,40 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
             self.train()
 
         self.cuda()
+        y_pred = None
         with torch.no_grad(): 
             if self.pipeline:
-                ret_val = apply_in_batches(self, self.pipeline.transform(X), batch_size=self.batch_size)
-            else:
-                ret_val = apply_in_batches(self, X, batch_size=self.batch_size)
+                X = self.pipeline.transform(X)
+            
+            x_tensor = torch.tensor(X)
+            
+            # At some point during development we had problems with inconsistend 
+            # data types and data interpretations and therefore we introduced a transformer for
+            # both, testing and training. It seems that PyTorch got this sorted now and 
+            # thus we do not need it anymore?
+            # if hasattr(model, "transformer") and model.transformer is not None:
+            #     test_transformer =  None 
+            #     # transforms.Compose([
+            #     #     transforms.ToPILImage(),
+            #     #     transforms.ToTensor() 
+            #     # ])
+            # else:
+            #     test_transformer = None
+            test_transformer = None
+            dataset = TransformTensorDataset(x_tensor,transform=test_transformer)
+            train_loader = torch.utils.data.DataLoader(dataset, batch_size = self.batch_size)
+            for data in train_loader:
+                data = data.cuda()
+                pred = self(data)
+                pred = pred.cpu().detach().numpy()
+                if y_pred is None:
+                    y_pred = pred
+                else:
+                    y_pred = np.concatenate( (y_pred, pred), axis=0 )
+            return y_pred
 
         self.train(before_eval)
-        return ret_val
+        return y_pred
 
     def predict(self, X, eval_mode=True):
         # print("pred", X.shape)
@@ -149,7 +175,7 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
             metrics = {}
             example_cnt = 0
 
-            with tqdm(total=len(train_loader.dataset), ncols=135, disable = not self.verbose) as pbar:
+            with tqdm(total=len(train_loader.dataset), ncols=150, disable = not self.verbose) as pbar:
                 for batch in train_loader:
                     data = batch[0]
                     target = batch[1]
@@ -219,6 +245,8 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
                         # for evaluating the test data. Maybe we should refactor this at some point and / or apply_in_batches
                         # is not really needed anymore as its own function?
                         # TODO Check if refactoring might be interestring here
+                        self.eval()
+
                         test_metrics = {}
                         x_tensor_test = torch.tensor(self.x_test)
                         y_tensor_test = torch.tensor(self.y_test)
@@ -231,12 +259,13 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
                             test_target = batch[1]
                             test_data, test_target = test_data.cuda(), test_target.cuda()
                             test_data, test_target = Variable(test_data), Variable(test_target)
-
-                            backward = self.prepare_backward(test_data, test_target)
+                            with torch.no_grad():
+                                backward = self.prepare_backward(test_data, test_target)
 
                             for key,val in backward["metrics"].items():
                                 test_metrics[key] = test_metrics.get(key,0) + val.sum().item()
 
+                        self.train()
                         for key,val in test_metrics.items():
                             out_dict["test_" + key] = val / len(self.y_test)
                             mstr += "test {} {:2.4f} ".format(key, val / len(self.y_test))
@@ -244,6 +273,7 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
                     desc = '[{}/{}] {}'.format(epoch, self.epochs-1, mstr)
                     pbar.set_description(desc)
                     
+                    out_dict["epoch"] = epoch
                     out_file_content = json.dumps(out_dict, sort_keys=True) + "\n"
                     outfile.write(out_file_content)
 
@@ -273,7 +303,7 @@ class SKEnsemble(SKLearnBaseModel):
             pred_combined = 1.0/self.n_estimators*torch.sum(torch.stack(base_preds, dim=1),dim=1)
             pred_combined = nn.functional.softmax(pred_combined,dim=1)
         else:   
-            pred_combined, _ =torch.stack(base_preds, dim=1).max(dim=1)
+            pred_combined, _ = torch.stack(base_preds, dim=1).max(dim=1)
         
         return pred_combined, base_preds
 

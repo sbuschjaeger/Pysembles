@@ -9,6 +9,8 @@ import copy
 import torch
 from torch import nn
 from torch.utils.data import Dataset
+from torch.autograd import Variable
+
 # from torch.autograd import Variable
 # from torch.optim.optimizer import Optimizer, required
 
@@ -178,34 +180,27 @@ def is_same_func(f1,f2):
     else:
         return f1 == f2
 
-def apply_in_batches(model, X, batch_size = 128):
-    y_pred = None
+def apply_in_batches(fun, X, batch_size):
     x_tensor = torch.tensor(X)
+
+    dataset = TransformTensorDataset(x_tensor, transform=None)
+    test_loader = torch.utils.data.DataLoader(dataset, batch_size = batch_size)
     
-    # At some point during development we had problems with inconsistend 
-    # data types and data interpretations and therefore we introduced a teansformer for
-    # both, testing and training. It seems that PyTorch got this sorted now and 
-    # thus we do not need it anymore?
-    # if hasattr(model, "transformer") and model.transformer is not None:
-    #     test_transformer =  None 
-    #     # transforms.Compose([
-    #     #     transforms.ToPILImage(),
-    #     #     transforms.ToTensor() 
-    #     # ])
-    # else:
-    #     test_transformer = None
-    test_transformer = None
-    dataset = TransformTensorDataset(x_tensor,transform=test_transformer)
-    train_loader = torch.utils.data.DataLoader(dataset, batch_size = batch_size)
-    for data in train_loader:
-        data = data.cuda()
-        pred = model(data)
-        pred = pred.cpu().detach().numpy()
-        if y_pred is None:
-            y_pred = pred
+    values = None
+    for batch in test_loader:
+        test_data = batch
+        test_data = test_data.cuda()
+        test_data = Variable(test_data)
+
+        val = fun(test_data)
+        val = val.cpu().detach().numpy()
+        
+        if values is None:
+            values = val
         else:
-            y_pred = np.concatenate( (y_pred, pred), axis=0 )
-    return y_pred
+            values = np.concatenate( (values, val), axis=0 )
+
+    return values
 
 # See: https://stackoverflow.com/questions/55588201/pytorch-transforms-on-tensordataset/55593757
 class TransformTensorDataset(Dataset):

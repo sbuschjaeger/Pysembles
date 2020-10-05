@@ -10,7 +10,7 @@ from torch.autograd import Variable
 from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import accuracy_score
 
-from .Utils import apply_in_batches, TransformTensorDataset
+from .Utils import TransformTensorDataset
 from .Models import SKEnsemble, SKLearnModel
 from .BinarisedNeuralNetworks import BinaryConv2d, BinaryLinear
 
@@ -40,8 +40,9 @@ class BaggingClassifier(SKEnsemble):
     - Webb, G. I. (2000). MultiBoosting: a technique for combining boosting and wagging. Machine Learning. https://doi.org/10.1023/A:1007659514849
     - Oza, N. C., & Russell, S. (2001). Online Bagging and Boosting. Retrieved from https://ti.arc.nasa.gov/m/profile/oza/files/ozru01a.pdf 
     """
-    def __init__(self, bootstrap = True, frac_examples = 1.0, freeze_layers = None, train_method = "fast", *args, **kwargs):
+    def __init__(self, n_estimators = 5, bootstrap = True, frac_examples = 1.0, freeze_layers = None, train_method = "fast", *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.n_estimators = n_estimators
         self.frac_samples = frac_examples
         self.bootstrap = bootstrap
         self.freeze_layers = freeze_layers
@@ -50,10 +51,10 @@ class BaggingClassifier(SKEnsemble):
             SKLearnModel(training_file="training_{}.jsonl".format(i), *args, **kwargs) for i in range(self.n_estimators)
         ])
 
-        assert self.frac_examples > 0 and self.frac_samples <= 1.0, "frac_examples expects the fraction of samples used, this must be between (0,1]. It was {}".format(self.frac_examples)
+        assert self.frac_samples > 0 and self.frac_samples <= 1.0, "frac_examples expects the fraction of samples used, this must be between (0,1]. It was {}".format(self.frac_samples)
 
     def prepare_backward(self, data, target, weights = None):
-        # TODO WHAT ABOUT frac_examples?
+        # TODO WHAT ABOUT frac_samples?
         f_bar, base_preds = self.forward_with_base(data)
 
         accuracies = []

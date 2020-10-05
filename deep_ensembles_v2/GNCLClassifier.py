@@ -7,7 +7,7 @@ from torch import nn
 from tqdm import tqdm
 
 from .Models import SKEnsemble
-from .Utils import TransformTensorDataset, apply_in_batches, cov, is_same_func
+from .Utils import TransformTensorDataset
 
 class GNCLClassifier(SKEnsemble):
     """ (Generalized) Negtaive Correlation Learning.
@@ -89,7 +89,10 @@ class GNCLClassifier(SKEnsemble):
             covar = torch.bmm(diff.unsqueeze(1), torch.bmm(D, diff.unsqueeze(2))).squeeze()
             div = 1.0/self.n_estimators * 0.5 * covar
             i_loss = self.loss_function(pred, target)
-            reg_loss = (1.0 - self.l_reg)*i_loss - self.l_reg * div
+            # NOTE: Technically we could also just scale everything by self.n_estimators and therefore
+            # ignore it for the optimization. However, to be consistent with the paper we are not doing that
+            # but we keep the original formulation
+            reg_loss = 1.0/self.n_estimators * (1.0 - self.l_reg)*i_loss - self.l_reg * div
             
             losses.append(reg_loss)
             accuracies.append(100.0*(pred.argmax(1) == target).type(torch.cuda.FloatTensor))
@@ -99,6 +102,7 @@ class GNCLClassifier(SKEnsemble):
         accuracies = torch.stack(accuracies, dim = 1)
         diversity = torch.stack(diversity, dim = 1)
         
+        # NOTE: avg loss is the average (regularized) loss and not the average loss (wrt. to the loss_function)
         d = {
             "prediction" : f_bar, 
             "backward" : losses.sum(dim=1), 
@@ -108,7 +112,7 @@ class GNCLClassifier(SKEnsemble):
                 "accuracy" : 100.0*(f_bar.argmax(1) == target).type(torch.cuda.FloatTensor), 
                 "avg loss": losses.mean(dim=1),
                 "avg accuracy": accuracies.mean(dim = 1),
-                "diversity": diversity.mean(dim = 1)
+                "diversity": diversity.sum(dim = 1)
             } 
             
         }
