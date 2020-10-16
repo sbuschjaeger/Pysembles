@@ -17,7 +17,7 @@ from torch.autograd import Variable
 import torchvision
 import torchvision.transforms as transforms
 
-from .BinarisedNeuralNetworks import binarize, BinaryTanh, BinaryLinear, BinaryConv2d
+from .models.BinarisedNeuralNetworks import binarize, BinaryTanh, BinaryLinear, BinaryConv2d, Scale
 
 # This function can be used as a scoring metric to score the number of parameters
 def pytorch_total_params(model, x, y):
@@ -59,18 +59,14 @@ def replace_layer_if_possible(layer):
         def forward(self, input):
             return torch.where(input > 0, torch.tensor([1.0]).cuda(), torch.tensor([-1.0]).cuda())
     
-    print("FOUND ", layer)
     if isinstance(layer, BinaryTanh):
-        print("REPLACING BINARY TANH")
         new_layer = Sign()
     elif isinstance(layer, BinaryLinear):
-        print("REPLACING LIN LAYER")
         new_layer = nn.Linear(layer.in_features, layer.out_features, hasattr(layer, 'bias'))
         if hasattr(layer, 'bias'):
             new_layer.bias.data = binarize(layer.bias).data
         new_layer.weight.data = binarize(layer.weight).data
     elif isinstance(layer, BinaryConv2d):
-        print("REPLACING CONV LAYER")
         new_layer = nn.Conv2d(
             layer.in_channels, layer.out_channels, layer.kernel_size, 
             layer.stride, layer.padding, layer.dilation, layer.groups, 
@@ -85,15 +81,11 @@ def replace_layer_if_possible(layer):
 
 def replace_sequential_if_possible(s):
     for i,si in enumerate(s):
-        print("CHECKING ", si)
         if hasattr(s[i], "layers_"):
-            print("LAYERS_ FOUND, REPLACING")
             s[i].layers_ = replace_sequential_if_possible(s[i].layers_)
         if isinstance(s[i], nn.Sequential):
-            print("SEQUENTIAL FOUND; REPLACING")
             s[i] = replace_sequential_if_possible(s[i])
         else:
-            print("REGULAR LAYER FOUND")
             s[i] = replace_layer_if_possible(s[i])
         # new_seq.append(tmp)
     return s
@@ -262,14 +254,6 @@ class Clamp(nn.Module):
 
     def forward(self, input):
         return input.clamp(self.min_out, self.max_out)
-
-class Scale(nn.Module):
-    def __init__(self, init_value=1e-3):
-        super().__init__()
-        self.scale = nn.Parameter(torch.FloatTensor([init_value]))
-
-    def forward(self, input):
-        return input * self.scale
 
 class SkipConnection(nn.Module):
     def __init__(self, *block):

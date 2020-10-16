@@ -12,7 +12,6 @@ from sklearn.metrics import accuracy_score
 
 from .Utils import TransformTensorDataset
 from .Models import SKEnsemble, SKLearnModel
-from .BinarisedNeuralNetworks import BinaryConv2d, BinaryLinear
 
 import copy
 
@@ -100,6 +99,7 @@ class BaggingClassifier(SKEnsemble):
         self.X_ = X
         self.y_ = y
 
+        # TODO REWORK THIS. IT CURRENTLY ASSUMES THAT EACH BASE LEARNER HAS layers_ WHICH MIGHT NOT BE THE CASE
         if self.freeze_layers is not None:
             for e in self.estimators_:
                 for i, l in enumerate(e.layers_[:self.freeze_layers]):

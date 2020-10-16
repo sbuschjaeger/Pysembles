@@ -333,7 +333,7 @@ class SKEnsemble(SKLearnBaseModel):
 class SKLearnModel(SKLearnBaseModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.layers_ = self.base_estimator()
+        self.model = self.base_estimator()
         
     def prepare_backward(self, data, target, weights = None):
         output = self(data)
@@ -356,9 +356,10 @@ class SKLearnModel(SKLearnBaseModel):
 
     def forward(self, x):
         try:
-            return self.layers_(x)
+            return self.model(x)
         except Exception as e:
-            for l in self.layers_:
+            for l in self.model.children():
+                # print(l)
                 x = l(x)
                 print(x.shape)
             raise e

@@ -15,11 +15,22 @@ from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import accuracy_score
 
 from .Models import SKLearnModel
-# from Models import Flatten
-from .BinarisedNeuralNetworks import BinaryTanh
-from .BinarisedNeuralNetworks import BinaryLinear
 
 class StackingClassifier(SKLearnModel):
+    """ Stacking Classifier.
+
+    Stacking stacks the predictions of each base learner into one large vector and then trains another model on this new
+    "example" vector. This implementation can be viewed as End2End stacking, in which both - the base models as well as
+    the combinator model - are trained in an end-to-end fashion. 
+
+    Attributes:
+        classifier (function): Generates and returns a new classifier. Please make sure, that it accepts the stacked input. 
+            The dimension of the input will likely change with different n_estimators. 
+
+    References:
+        - Wolpert, D. (1992). Stacked Generalization ( Stacking ). Neural Networks.
+        - Breiman, L. (1996). Stacked regressions. Machine Learning. https://doi.org/10.1007/bf00117832
+    """
     def __init__(self, classifier, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.estimators_ = nn.ModuleList([ self.base_estimator() for _ in range(self.n_estimators)])

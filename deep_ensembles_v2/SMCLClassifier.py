@@ -10,6 +10,13 @@ from .Models import SKEnsemble
 class SMCLClassifier(SKEnsemble):
     """ Stochastic Multiple Choice Learning Classifier.
 
+    As often argued, diversity might be important for ensembles to work well. Stochastic Multiple Choice Learning (SMCL)
+    enforces diversity by training each expert model on a subset of the training data for which it already works
+    pretty well. Due to the random initialization each ensemble member is likely to perform better or worse on different
+    parts of the data and thereby introducing diversity. SMCL enforces this specialization by selecting the best
+    expert (wrt. to the loss) for each example and then only updating that one expert for that example. All other experts
+    will never receive that example. 
+
     Attributes:
         n_estimators (int): Number of estimators in ensemble
 

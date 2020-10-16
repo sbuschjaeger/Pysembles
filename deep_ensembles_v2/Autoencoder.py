@@ -55,6 +55,7 @@ class UnFlatten(nn.Module):
         return x.view(self.flatten.shape)
 
 def encoder_decoder(encoder, decoder = None):
+    # TODO THIS ASSUME THAT WE CAN ITERATE OVER THE MODEL. IS THIS CORRECT?
     enc = []
     for l in encoder():
         if isinstance(l, nn.MaxPool2d):
