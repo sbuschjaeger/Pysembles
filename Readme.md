@@ -49,8 +49,9 @@ expert (wrt. to the loss) for each example and then only updating that one exper
 will never receive that example. 
 
 References:
-    - Lee, S., Purushwalkam, S., Cogswell, M., Ranjan, V., Crandall, D., & Batra, D. (2016). Stochastic multiple choice learning for training diverse deep ensembles. Advances in Neural Information Processing Systems, 1(Nips), 2127–2135. Retrieved from http://papers.nips.cc/paper/6270-stochastic-multiple-choice-learning-for-training-diverse-deep-ensembles.pdf
-- Stacking
+- Lee, S., Purushwalkam, S., Cogswell, M., Ranjan, V., Crandall, D., & Batra, D. (2016). Stochastic multiple choice learning for training diverse deep ensembles. Advances in Neural Information Processing Systems, 1(Nips), 2127–2135. Retrieved from http://papers.nips.cc/paper/6270-stochastic-multiple-choice-learning-for-training-diverse-deep-ensembles.pdf
+
+### Stacking
 Stacking stacks the predictions of each base learner into one large vector and then trains another model on this new
 "example" vector. This implementation can be viewed as End2End stacking, in which both - the base models as well as
 the combinator model - are trained in an end-to-end fashion. 
