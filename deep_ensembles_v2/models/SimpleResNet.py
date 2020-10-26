@@ -23,7 +23,7 @@ class BasicBlock(nn.Module):
         return nn.functional.max_pool2d(out, kernel_size=2,stride=2)
 
 class SimpleResNet(nn.Module):
-    def __init__(self, hidden_size = 1024, n_channels = 64, depth = 2):
+    def __init__(self, n_channels = 64, depth = 2, num_classes = 100):
         super().__init__()
         
         if depth == 1:
@@ -53,7 +53,7 @@ class SimpleResNet(nn.Module):
             # LinearLayer(lin_size, hidden_size),
             # nn.BatchNorm1d(hidden_size),
             # Activation(),
-            nn.Linear(lin_size, 100)
+            nn.Linear(lin_size, num_classes)
         ])
 
         model = filter(None, model)
