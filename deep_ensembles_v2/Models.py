@@ -358,9 +358,20 @@ class SKLearnModel(SKLearnBaseModel):
         try:
             return self.model(x)
         except Exception as e:
-            for l in self.model.children():
-                # print(l)
+            # This is just some random code which might help during debugging of the model, e.g. if the size of the linear layer does not
+            # match the input after a flatten
+            # Per convention we use "layers_" as a sequential which works nicely. If the model is more complex however, we simply
+            # iterate over the children, which does not work as nicely if there is alreay a problem in a single child. 
+            # TODO: We should enhance this, e.g. by recursivley executing children (lol, that sounds weird)
+            if hasattr(self.model, "layers_"):
+                layers = self.layers_
+            else:
+                layers = self.model.children()
+                
+            for l in layers:
+                print(l)
+                print("IN: ", x.shape)
                 x = l(x)
-                print(x.shape)
+                print("OUT: ", x.shape, " \n")
             raise e
         # return self.layers_(x)
