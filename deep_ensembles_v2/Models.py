@@ -149,12 +149,12 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
         self.X_ = X
         self.y_ = y
 
-        optimizer = self.optimizer_method(self.parameters(), **self.optimizer)
+        self.optimizer = self.optimizer_method(self.parameters(), **self.optimizer)
         
         if self.scheduler_method is not None:
-            scheduler = self.scheduler_method(optimizer, **self.scheduler)
+            self.scheduler = self.scheduler_method(self.optimizer, **self.scheduler)
         else:
-            scheduler = None
+            self.scheduler = None
 
         cuda_cfg = {'num_workers': 1, 'pin_memory': True} 
         
@@ -170,12 +170,15 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
 
         if self.out_path is not None:
             outfile = open(self.out_path + "/" + self.training_file, "w", 1)
-
+        
+        self.cur_epoch = 0
         for epoch in range(self.epochs):
+            self.cur_epoch = epoch + 1
             metrics = {}
             example_cnt = 0
 
             with tqdm(total=len(train_loader.dataset), ncols=150, disable = not self.verbose) as pbar:
+                self.batch_cnt = 0
                 for batch in train_loader:
                     data = batch[0]
                     target = batch[1]
@@ -190,7 +193,7 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
                     else:
                         weights = None
 
-                    optimizer.zero_grad()
+                    self.optimizer.zero_grad()
 
                     # We assume that prepare_backward computes the appropriate loss and possible some statistics 
                     # the user wants to store / output. To do so, prepare_backward should return a dictionary with 
@@ -214,7 +217,7 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
                         metrics[key] = metrics.get(key,0) + val.sum().item()
                     
                     backward["backward"].mean().backward()
-                    optimizer.step()
+                    self.optimizer.step()
 
                     mstr = ""
                     for key,val in metrics.items():
@@ -223,9 +226,10 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
                     pbar.update(data.shape[0])
                     desc = '[{}/{}] {}'.format(epoch, self.epochs-1, mstr)
                     pbar.set_description(desc)
+                    self.batch_cnt += 1
 
-                if scheduler is not None:
-                    scheduler.step()
+                if self.scheduler is not None:
+                    self.scheduler.step()
 
                 torch.cuda.empty_cache()
                 
@@ -297,10 +301,13 @@ class SKEnsemble(SKLearnBaseModel):
 
         # # base_preds = [self.estimators_[i](X) for i in torch.range(self.n_estimators)] #self.n_estimators
         base_preds = [e(X) for e in self.estimators_] #self.n_estimators
+        # Some ensemble methods may introduce / remove new models while optimization. Thus we cannot use
+        # self.n_estimators which is the (maximum) number of models in the ensemble, but not the current one
+        n_estimators = len(self.estimators_)
         if self.combination_type == "average":
-            pred_combined = 1.0/self.n_estimators*torch.sum(torch.stack(base_preds, dim=1),dim=1)
+            pred_combined = 1.0/n_estimators*torch.sum(torch.stack(base_preds, dim=1),dim=1)
         elif self.combination_type == "softmax":
-            pred_combined = 1.0/self.n_estimators*torch.sum(torch.stack(base_preds, dim=1),dim=1)
+            pred_combined = 1.0/n_estimators*torch.sum(torch.stack(base_preds, dim=1),dim=1)
             pred_combined = nn.functional.softmax(pred_combined,dim=1)
         else:   
             pred_combined, _ = torch.stack(base_preds, dim=1).max(dim=1)

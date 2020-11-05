@@ -19,7 +19,11 @@ from sklearn.metrics import accuracy_score
 from .Models import SKEnsemble 
 
 class GradientBoostedNets(SKEnsemble):
-    def __init__(self, n_estimators = 5, *args, **kwargs):
+    ''' (Stochastic) Gradient Boosting for Neural Networks
+    Gradient Boosting sequentially trains a classifier
+
+    '''
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.estimators_ = nn.ModuleList([ self.base_estimator() for _ in range(self.n_estimators)])
         

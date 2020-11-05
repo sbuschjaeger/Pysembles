@@ -39,9 +39,8 @@ class BaggingClassifier(SKEnsemble):
     - Webb, G. I. (2000). MultiBoosting: a technique for combining boosting and wagging. Machine Learning. https://doi.org/10.1023/A:1007659514849
     - Oza, N. C., & Russell, S. (2001). Online Bagging and Boosting. Retrieved from https://ti.arc.nasa.gov/m/profile/oza/files/ozru01a.pdf 
     """
-    def __init__(self, n_estimators = 5, bootstrap = True, frac_examples = 1.0, freeze_layers = None, train_method = "fast", *args, **kwargs):
+    def __init__(self, bootstrap = True, frac_examples = 1.0, freeze_layers = None, train_method = "fast", *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.n_estimators = n_estimators
         self.frac_samples = frac_examples
         self.bootstrap = bootstrap
         self.freeze_layers = freeze_layers
