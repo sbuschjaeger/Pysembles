@@ -11,7 +11,7 @@ from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import accuracy_score
 
 from .Utils import Flatten, TransformTensorDataset, apply_in_batches, Scale
-from .Models import SKLearnModel
+from .Models import BaseModel
 from .BinarisedNeuralNetworks import binarize, BinaryTanh, BinaryLinear, BinaryConv2d
 
 class UnpoolableMaxPool2d(nn.Module):
@@ -115,120 +115,48 @@ def encoder_decoder(encoder, decoder = None):
     model = enc + dec
     return nn.Sequential(*model)
 
-class Autoencoder(SKLearnModel):
+class Autoencoder(BaseModel):
     def __init__(self, encoder, decoder = None, *args, **kwargs):
         base_estimator = partial(encoder_decoder, encoder = encoder, decoder = decoder)
         super().__init__(base_estimator=base_estimator,*args, **kwargs)
         
+        self.encoder = encoder
+        
         tmp_enc = encoder()
-        self.encoder = self.layers_[0:len(tmp_enc)]
+        self.encoder_ = self.model[0:len(tmp_enc)]
 
-    def fit(self, X, y = None, sample_weight = None):
-        # if y is not None:
-        #     raise ValueError("The autoencoder should not receive any labels!") 
-        x_tensor = torch.tensor(X)
-
-        if sample_weight is not None:
-            sample_weight = len(y)*sample_weight/np.sum(sample_weight)
-            w_tensor = torch.tensor(sample_weight)
-            w_tensor = w_tensor.type(torch.FloatTensor)
-            data = TransformTensorDataset(x_tensor, w_tensor, transform=self.transformer)
-        else:
-            w_tensor = None
-            data = TransformTensorDataset(x_tensor, transform=self.transformer)
-
-        self.X_ = X
-
-        # We have to set this variable to make the auto-encoder SKLEarn compatible
-        self.y_ = None
-
-        optimizer = self.optimizer_method(self.parameters(), **self.optimizer)
+    def restore_state(self,checkpoint):
+        super().restore_state(checkpoint)
         
-        if self.scheduler_method is not None:
-            scheduler = self.scheduler_method(optimizer, **self.scheduler)
-        else:
-            scheduler = None
+        tmp_enc = encoder()
+        self.encoder_ = self.model[0:len(tmp_enc)]
 
-        cuda_cfg = {'num_workers': 1, 'pin_memory': True} 
-        
-        train_loader = torch.utils.data.DataLoader(
-            data,
-            batch_size=self.batch_size, 
-            shuffle=True, 
-            **cuda_cfg
-        )
 
-        self.cuda()
-        self.train()
+    def get_state(self):
+        state = super().get_state()
+        return {
+            **state,
+            "encoder":self.encoder
+        } 
 
-        if self.out_path is not None:
-            #file_cnt = sum([1 if "training" in fname else 0 for fname in os.listdir(self.out_path)])
-            outfile = open(self.out_path + "/" + self.training_csv, "w", 1)
-            o_str = "epoch,train-loss"
+    def prepare_backward(self, data, target = None, weights = None):
+        output = self(data)
+        # print("Data shape is {}".format(data.shape))
+        # print("Output shape is {}".format(output.shape))
 
-            outfile.write(o_str + "\n")
+        dim = 1.0
+        for d in data.shape[1:]:
+            dim *= d
 
-        for epoch in range(self.epochs):
-            epoch_loss = 0
-            example_cnt = 0
-            batch_cnt = 0
-
-            with tqdm.tqdm(total=len(train_loader.dataset), ncols=135, disable = not self.verbose) as pbar:
-                for batch in train_loader:
-                    if sample_weight is not None:
-                        data = batch[0]
-                        weights = batch[1]
-
-                        weights = weights.cuda()
-                        weights = Variable(weights)
-                    else:
-                        data = batch
-
-                    data = data.cuda()
-                    data = Variable(data)
-
-                    optimizer.zero_grad()
-                    output = self(data)
-                    # print("Data shape is {}".format(data.shape))
-                    # print("Output shape is {}".format(output.shape))
-
-                    dim = 1.0
-                    for d in data.shape[1:]:
-                        dim *= d
-
-                    if sample_weight is not None: 
-                        loss = self.loss_function(data, output, weights)
-                        epoch_loss += loss.sum().item() / dim
-                        loss = loss.mean()
-                    else:
-                        loss = self.loss_function(data, output)
-                        epoch_loss += loss.sum().item() / dim
-                        loss = loss.mean()
-                    
-                    loss.backward()
-                    optimizer.step()
-
-                    pbar.update(data.shape[0])
-                    example_cnt += data.shape[0]
-                    batch_cnt += 1
-                    desc = '[{}/{}] loss {:2.4f}'.format(
-                        epoch, 
-                        self.epochs-1, 
-                        epoch_loss/example_cnt
-                    )
-                    pbar.set_description(desc)
-
-            if scheduler is not None:
-                scheduler.step()
-
-            torch.cuda.empty_cache()
+        d = {
+            "backward" : self.loss_function(data, output), 
+            "metrics" :
+            {
+                "loss" : loss / dim
+            } 
             
-            if self.out_path is not None:
-                outfile.write("{},{}\n".format(epoch, epoch_loss/example_cnt))
-    
-    # For convenience we override predict and use predict_proba. 
-    def predict(self, X, eval_mode=True):
-        return self.predict_proba(X,eval_mode)
+        }
+        return d
 
     def forward(self, x):
         if self.training:
@@ -236,6 +164,6 @@ class Autoencoder(SKLearnModel):
             #     print("Running layer {} of type {} on shape {}".format(i, l.__class__.__name__, x.shape))
             #     x = l(x)
             # return x 
-            return self.layers_(x)
+            return self.model(x)
         else:
-            return self.encoder(x)
+            return self.encoder_(x)

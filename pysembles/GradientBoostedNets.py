@@ -16,9 +16,9 @@ from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import accuracy_score
 
-from .Models import SKEnsemble 
+from .Models import Ensemble 
 
-class GradientBoostedNets(SKEnsemble):
+class GradientBoostedNets(Ensemble):
     ''' (Stochastic) Gradient Boosting for Neural Networks
     Gradient Boosting sequentially trains a classifier
 
@@ -59,7 +59,7 @@ class GradientBoostedNets(SKEnsemble):
             "metrics" :
             {
                 "loss" : self.loss_function(f_bar, target),
-                "accuracy" : 100.0*(f_bar.argmax(1) == target).type(torch.cuda.FloatTensor), 
+                "accuracy" : 100.0*(f_bar.argmax(1) == target).type(self.get_float_type()), 
             } 
             
         }

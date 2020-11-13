@@ -16,10 +16,10 @@ from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import accuracy_score
 
-from .Models import SKEnsemble
+from .Models import Ensemble
 from .Utils import TransformTensorDataset#, weighted_mse_loss, weighted_squared_hinge_loss
 
-class E2EEnsembleClassifier(SKEnsemble):
+class E2EEnsembleClassifier(Ensemble):
     """ End-to-End (E2E) Learning of the entire ensemble by viewing it as a single model.
     
     Directly E2E training of the entire ensemble. Just get the prediction of each base model, aggregate it and perform SGD on it as if it would be a new fancy Deep Learning architecture. Surprisingly, this approach is often overlooked in literature and sometimes it has strange names. I'll try to gather some references below, but apart from that there is nothing out of the ordinary to explain about this model compared to regular Deep architectures. 
@@ -48,7 +48,7 @@ class E2EEnsembleClassifier(SKEnsemble):
             if weights is not None:
                 iloss *= weights 
             losses.append(iloss.detach())
-            accuracies.append(100.0*(pred.argmax(1) == target).type(torch.cuda.FloatTensor))
+            accuracies.append(100.0*(pred.argmax(1) == target).type(self.get_float_type()))
 
         avg_losses = torch.stack(losses, dim = 1).mean(dim = 1)
         avg_accuracy = torch.stack(accuracies, dim = 1).mean(dim = 1)
@@ -59,7 +59,7 @@ class E2EEnsembleClassifier(SKEnsemble):
             "metrics" :
             {
                 "loss" : loss.detach(),
-                "accuracy" : 100.0*(f_bar.argmax(1) == target).type(torch.cuda.FloatTensor), 
+                "accuracy" : 100.0*(f_bar.argmax(1) == target).type(self.get_float_type()), 
                 "avg loss": avg_losses,
                 "avg accuracy": avg_accuracy
             } 

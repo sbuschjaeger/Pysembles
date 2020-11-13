@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from deep_ensembles_v2.Utils import Flatten
+from pysembles.Utils import Flatten
 
 class BasicBlock(nn.Module):
     def __init__(self, in_planes, planes):

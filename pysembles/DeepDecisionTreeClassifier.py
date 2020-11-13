@@ -17,9 +17,9 @@ from sklearn.utils.validation import check_is_fitted
 from sklearn.metrics import accuracy_score
 
 from .Utils import TransformTensorDataset
-from .Models import SKLearnModel
+from .Models import Model
 
-class DeepDecisionTreeClassifier(SKLearnModel):
+class DeepDecisionTreeClassifier(Model):
     def __init__(self, split_estimator, leaf_estimator, depth, soft=False, *args, **kwargs):
         super().__init__(base_estimator = lambda: None, *args, **kwargs)
         
@@ -50,6 +50,40 @@ class DeepDecisionTreeClassifier(SKLearnModel):
                 tmp_path.append(p2)
             cur_path = tmp_path
         self.all_pathes = cur_path
+
+    def restore_state(self,checkpoint):
+        super().restore_state(checkpoint)
+
+        self.depth = checkpoint["depth"]
+        self.split_estimator = checkpoint["split_estimator"]
+        self.leaf_estimator = checkpoint["leaf_estimator"]
+        self.soft = checkpoint["soft"]
+        self.n_inner = checkpoint["n_inner"]
+        self.n_leafs = checkpoint["n_leafs"]
+        self.all_pathes = checkpoint["all_pathes"]
+
+        for i in range(self.n_inner):
+             self.layers_.append(self.split_estimator())
+        
+        for i in range(self.n_leafs):
+             self.layers_.append(self.leaf_estimator())
+        
+        self.layers_ = nn.Sequential(*self.layers_)
+        self.layers_.load_state_dict(checkpoint["layers_state_dict"])
+
+    def get_state(self):
+        state = super().get_state()
+        return {
+            **state,
+            "depth":self.depth,
+            "split_estimator":self.split_estimator,
+            "leaf_estimator":self.leaf_estimator,
+            "soft":self.soft,
+            "n_inner":self.n_inner,
+            "n_leafs":self.n_leafs,
+            "all_pathes":self.all_pathes,
+            "layers_state_dict":self.layers_.state_dict()
+        } 
 
     def forward(self, x):
         # Execute all models; This can be improved

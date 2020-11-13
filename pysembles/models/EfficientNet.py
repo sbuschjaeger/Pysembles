@@ -177,9 +177,6 @@
 # #     }
 # #     return EfficientNet(cfg)
 
-from deep_ensembles_v2.BinarisedNeuralNetworks import BinaryConv2d, BinaryLinear, BinaryTanh
-from deep_ensembles_v2.Utils import Scale
-
 '''EfficientNet in PyTorch.
 Paper: "EfficientNet: Rethinking Model Scaling for Convolutional Neural Networks".
 '''

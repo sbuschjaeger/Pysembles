@@ -20,7 +20,7 @@ import torchvision.transforms as transforms
 from .models.BinarisedNeuralNetworks import binarize, BinaryTanh, BinaryLinear, BinaryConv2d, Scale
 
 # This function can be used as a scoring metric to score the number of parameters
-def pytorch_total_params(model, x, y):
+def pytorch_total_params(model):
     return sum(p.numel() for p in model.parameters())
 
 def flatten_dict(d):

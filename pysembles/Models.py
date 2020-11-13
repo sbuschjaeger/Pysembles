@@ -2,177 +2,211 @@ import os
 import random
 import copy
 import json
+import types
 import torch
 from torch import nn
 from torch.autograd import Variable
+from torch.cuda.amp import GradScaler
+from torch.cuda.amp import autocast
 import numpy as np
 from tqdm import tqdm
 
-from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import check_is_fitted
 from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import accuracy_score
 
 from .Utils import store_model, TransformTensorDataset, apply_in_batches
 
-class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
-    def __init__(self, optimizer, scheduler, loss_function, 
-                 base_estimator, 
-                 training_file="training.jsonl",
-                 transformer = None,
-                 pipeline = None,
-                 seed = None,
-                 verbose = True, out_path = None, 
-                 x_test = None, y_test = None, 
-                 eval_test = 5,
-                 store_on_eval = False) :
+class BaseModel(nn.Module):
+    def __init__(self, 
+                    optimizer, 
+                    scheduler, 
+                    loss_function, 
+                    base_estimator, 
+                    training_file="training.jsonl",
+                    seed = None,
+                    verbose = True, 
+                    out_path = None, 
+                    test_data = None,
+                    eval_every = 5,
+                    store_every = None,
+                    device = "cuda",
+                    loader = None,
+                    use_amp = False
+                ) :
         super().__init__()
         
+        if isinstance(base_estimator, types.LambdaType) and base_estimator.__name__ == "<lambda>":
+            print("Warning: base_estimator is a lambda function in Models.py - This is fine, unless you want to store checkpoints of your model. This will likely fail since unnamed functions cannot be pickled. Consider naming it.")
+
         if optimizer is not None:
             optimizer_copy = copy.deepcopy(optimizer)
-            self.batch_size = optimizer_copy.pop("batch_size")
-            self.epochs = optimizer_copy.pop("epochs")
             self.optimizer_method = optimizer_copy.pop("method")
-            self.optimizer = optimizer_copy
+            if "epochs" in optimizer_copy:
+                self.epochs = optimizer_copy.pop("epochs")
+            else:
+                self.epochs = 1
+
+            self.optimizer_cfg = optimizer_copy
         else:
-            self.optimizer = None
+            self.optimizer_cfg = None
 
         if scheduler is not None:
             scheduler_copy = copy.deepcopy(scheduler)
             self.scheduler_method = scheduler_copy.pop("method")
-            self.scheduler = scheduler_copy
+            self.scheduler_cfg = scheduler_copy
         else:
-            self.scheduler = None
+            self.scheduler_cfg = None
             
+        if loader is not None:
+            self.loader_cfg = loader
+        else:
+            self.loader_cfg =  {'num_workers': 1, 'pin_memory': True, 'batch_size':128} 
+
         self.base_estimator = base_estimator
         self.loss_function = loss_function
-        self.transformer = transformer
-        self.pipeline = pipeline
         self.verbose = verbose
         self.out_path = out_path
-        self.x_test = x_test
-        self.y_test = y_test
+        self.test_data = test_data
         self.seed = seed
-        self.eval_test = eval_test
-        self.store_on_eval = store_on_eval
+        self.eval_every = eval_every
+        self.store_every = store_every
         self.training_file = training_file
-
-        if seed is not None:
+        self.cur_epoch = 0
+        self.resume_from_checkpoint = False
+        self.device = device
+        self.use_amp = use_amp
+        
+        if self.seed is not None:
             np.random.seed(seed)
             random.seed(seed)
             torch.manual_seed(seed)
             # if you are using GPU
-            torch.cuda.manual_seed(seed)
-            torch.cuda.manual_seed_all(seed)
+            if self.device != "cpu":
+                torch.cuda.manual_seed(seed)
+                torch.cuda.manual_seed_all(seed)
 
-    def store(self, out_path, dim, name="model"):
-        shallow_copy = copy.copy(self)
-        shallow_copy.X_ = np.array(1)
-        shallow_copy.y_ = np.array(1)
-        shallow_copy.base_estimator = None
-        shallow_copy.x_test = None
-        shallow_copy.y_test = None
-        torch.save(shallow_copy, os.path.join(out_path, name + ".pickle"))
-        store_model(self, "{}/{}.onnx".format(out_path, name), dim, verbose=self.verbose)
-
-    def predict_proba(self, X, eval_mode=True):
-        # print("pred proba", X.shape)
-        check_is_fitted(self, ['X_', 'y_'])
-        before_eval = self.training
-        
-        if eval_mode:
-            self.eval()
+    def get_float_type(self):
+        if self.device == "cpu":
+            return torch.FloatTensor
         else:
-            self.train()
+            return torch.cuda.FloatTensor
 
-        self.cuda()
-        y_pred = None
-        with torch.no_grad(): 
-            if self.pipeline:
-                X = self.pipeline.transform(X)
-            
-            x_tensor = torch.tensor(X)
-            
-            # At some point during development we had problems with inconsistend 
-            # data types and data interpretations and therefore we introduced a transformer for
-            # both, testing and training. It seems that PyTorch got this sorted now and 
-            # thus we do not need it anymore?
-            # if hasattr(model, "transformer") and model.transformer is not None:
-            #     test_transformer =  None 
-            #     # transforms.Compose([
-            #     #     transforms.ToPILImage(),
-            #     #     transforms.ToTensor() 
-            #     # ])
-            # else:
-            #     test_transformer = None
-            test_transformer = None
-            dataset = TransformTensorDataset(x_tensor,transform=test_transformer)
-            train_loader = torch.utils.data.DataLoader(dataset, batch_size = self.batch_size)
-            for data in train_loader:
-                data = data.cuda()
-                pred = self(data)
-                pred = pred.cpu().detach().numpy()
-                if y_pred is None:
-                    y_pred = pred
-                else:
-                    y_pred = np.concatenate( (y_pred, pred), axis=0 )
-            return y_pred
-
-        self.train(before_eval)
-        return y_pred
-
-    def predict(self, X, eval_mode=True):
-        # print("pred", X.shape)
-        pred = self.predict_proba(X, eval_mode)
-        return np.argmax(pred, axis=1)
-
-    def fit(self, X, y, sample_weight = None):
-        self.classes_ = unique_labels(y)
-        self.n_classes_ = len(self.classes_)
-
-        if self.pipeline:
-            X = self.pipeline.fit_transform(X)
-
-        x_tensor = torch.tensor(X)
-        y_tensor = torch.tensor(y)
-        y_tensor = y_tensor.type(torch.LongTensor) 
-
-        if sample_weight is not None:
-            #sample_weight = len(y)*sample_weight/np.sum(sample_weight)
-            w_tensor = torch.tensor(sample_weight)
-            w_tensor = w_tensor.type(torch.FloatTensor)
-            data = TransformTensorDataset(x_tensor,y_tensor,w_tensor,transform=self.transformer)
-        else:
-            w_tensor = None
-            data = TransformTensorDataset(x_tensor,y_tensor,transform=self.transformer)
-
-        self.X_ = X
-        self.y_ = y
-
-        self.optimizer = self.optimizer_method(self.parameters(), **self.optimizer)
+    def restore_state(self,checkpoint):
+        self.optimizer_method = checkpoint["optimizer_method"]
+        self.optimizer_cfg = checkpoint["optimizer_cfg"]
+        self.scheduler_method = checkpoint["scheduler_method"]
+        self.scheduler_cfg = checkpoint["scheduler_cfg"]
+        self.loader_cfg = checkpoint["loader_cfg"]
+        self.scheduler = checkpoint["scheduler"]
+        self.base_estimator = checkpoint["base_estimator"]
+        self.loss_function = checkpoint["loss_function"]
+        self.verbose = checkpoint["verbose"]
+        self.out_path = checkpoint["out_path"]
+        self.test_data = checkpoint["test_data"]
+        self.seed = checkpoint["seed"]
+        self.eval_every = checkpoint["eval_every"]
+        self.store_every = checkpoint["store_every"]
+        self.training_file = checkpoint["training_file"]
+        self.cur_epoch = checkpoint["cur_epoch"]
+        self.epochs = checkpoint["epochs"]
+        self.resume_from_checkpoint = True
+        self.device = checkpoint["device"]
+        self.use_amp = checkpoint["use_amp"]
+        self.scaler = GradScaler(enabled = self.use_amp)
         
+        self.scaler.load_state_dict(checkpoint['scaler_state_dict'])
+
+        if self.seed is not None:
+            np.random.seed(seed)
+            random.seed(seed)
+            torch.manual_seed(seed)
+            # if you are using GPU
+            if self.device != "cpu": 
+                torch.cuda.manual_seed(seed)
+                torch.cuda.manual_seed_all(seed)
+        
+        self.load_state_dict(checkpoint['state_dict'])
+
+        # Load the model to the correct device _before_ we init the optimizer
+        # https://github.com/pytorch/pytorch/issues/2830
+        self.to(self.device)
+
+        self.optimizer = self.optimizer_method(self.parameters(), **self.optimizer_cfg)
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
         if self.scheduler_method is not None:
-            self.scheduler = self.scheduler_method(self.optimizer, **self.scheduler)
+            self.scheduler = self.scheduler_method(self.optimizer, **self.scheduler_cfg)
+            self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
         else:
             self.scheduler = None
 
-        cuda_cfg = {'num_workers': 1, 'pin_memory': True} 
-        
+        if self.loader_cfg is None:
+            self.loader_cfg =  {'num_workers': 1, 'pin_memory': True, 'batch_size':128} 
+
+    def restore_checkoint(self, path):
+        # https://github.com/pytorch/pytorch/issues/2830
+        checkpoint = torch.load(path, map_location = self.device)
+        self.restore_state(checkpoint)
+
+    def get_state(self):
+        return {
+            "optimizer_method" : self.optimizer_method,
+            "optimizer_cfg" : self.optimizer_cfg,
+            "loader_cfg" : self.loader_cfg,
+            "scheduler_method" : self.scheduler_method,
+            "scheduler_cfg" : self.scheduler_cfg,
+            "scheduler" : self.scheduler,
+            "base_estimator" : self.base_estimator,
+            "loss_function" : self.loss_function,
+            "verbose" : self.verbose,
+            "out_path" : self.out_path,
+            "test_data" : self.test_data,
+            "seed" : self.seed,
+            "device" : self.device,
+            "eval_every" : self.eval_every,
+            "store_every" : self.store_every,
+            "training_file" : self.training_file,
+            'cur_epoch': self.cur_epoch,
+            'epochs': self.epochs, 
+            'use_amp': self.use_amp, 
+            'state_dict': self.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'scheduler_state_dict': None if not self.scheduler else self.scheduler.state_dict(),
+            'scaler_state_dict': self.scaler.state_dict()
+        }
+
+    def store_checkpoint(self):
+        state = self.get_state()
+        torch.save(state, os.path.join(self.out_path, 'model_{}.tar'.format(self.cur_epoch)))
+
+    def fit(self, data):
+        if not self.resume_from_checkpoint:
+            self.optimizer = self.optimizer_method(self.parameters(), **self.optimizer_cfg)
+            
+            if self.scheduler_method is not None:
+                self.scheduler = self.scheduler_method(self.optimizer, **self.scheduler_cfg)
+            else:
+                self.scheduler = None
+
+            self.scaler = GradScaler(enabled=self.use_amp)
+
+            if self.out_path is not None:
+                outfile = open(self.out_path + "/" + self.training_file, "w", 1)
+        else:
+            if self.out_path is not None:
+                outfile = open(self.out_path + "/" + self.training_file, "a", 1)
+
         train_loader = torch.utils.data.DataLoader(
             data,
-            batch_size=self.batch_size, 
             shuffle=True, 
-            **cuda_cfg
+            **self.loader_cfg
         )
 
-        self.cuda()
-        self.train()
+        self.to(self.device)
 
-        if self.out_path is not None:
-            outfile = open(self.out_path + "/" + self.training_file, "w", 1)
-        
-        self.cur_epoch = 0
-        for epoch in range(self.epochs):
+        self.train()
+        for epoch in range(self.cur_epoch, self.epochs):
             self.cur_epoch = epoch + 1
             metrics = {}
             example_cnt = 0
@@ -180,18 +214,29 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
             with tqdm(total=len(train_loader.dataset), ncols=150, disable = not self.verbose) as pbar:
                 self.batch_cnt = 0
                 for batch in train_loader:
-                    data = batch[0]
-                    target = batch[1]
-                    data, target = data.cuda(), target.cuda()
-                    data, target = Variable(data), Variable(target)
-                    example_cnt += data.shape[0]
+                    if len(batch) == 1:
+                        data = batch
+                    else:
+                        data = batch[0]
 
-                    if sample_weight is not None:
+                    data = data.to(self.device)
+                    data = Variable(data)
+
+                    if len(batch) > 1:
+                        target = batch[1]
+                        target = target.to(self.device)
+                        target = Variable(target)
+                    else:
+                        target = None
+
+                    if len(batch) > 2:
                         weights = batch[2]
-                        weights = weights.cuda()
+                        weights = weights.to(self.device)
                         weights = Variable(weights)
                     else:
                         weights = None
+
+                    example_cnt += data.shape[0]
 
                     self.optimizer.zero_grad()
 
@@ -208,16 +253,19 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
                     #     "metrics" :
                     #     {
                     #         "loss" : self.loss_function(self(data), target),
-                    #         "accuracy" : 100.0*(self(data).argmax(1) == target).type(torch.cuda.FloatTensor)
+                    #         "accuracy" : 100.0*(self(data).argmax(1) == target).type(self.get_float_type())
                     #     } 
                     # }
-                    backward = self.prepare_backward(data, target, weights)
-                    
+                    with autocast(enabled = self.use_amp):
+                        backward = self.prepare_backward(data, target, weights)
+                        loss = backward["backward"].mean()
+
                     for key,val in backward["metrics"].items():
                         metrics[key] = metrics.get(key,0) + val.sum().item()
                     
-                    backward["backward"].mean().backward()
-                    self.optimizer.step()
+                    self.scaler.scale(loss).backward()
+                    self.scaler.step(self.optimizer)
+                    self.scaler.update()
 
                     mstr = ""
                     for key,val in metrics.items():
@@ -231,7 +279,7 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
                 if self.scheduler is not None:
                     self.scheduler.step()
 
-                torch.cuda.empty_cache()
+                #torch.cuda.empty_cache()
                 
                 if self.out_path is not None:
                     out_dict = {}
@@ -241,10 +289,10 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
                         out_dict["train_" + key] = val / example_cnt
                         mstr += "{} {:2.4f} ".format(key, val / example_cnt)
 
-                    if self.x_test is not None and self.eval_test is not None and self.eval_test > 0 and epoch % self.eval_test == 0:
-                        if self.store_on_eval:
-                            torch.save(self.state_dict(), os.path.join(self.out_path, 'model_{}.checkpoint'.format(epoch)))
+                    if self.store_every and self.store_every > 0 and (epoch % self.store_every) == 0:
+                        self.store_checkpoint()
 
+                    if self.test_data and self.eval_every and self.eval_every > 0 and (epoch % self.eval_every) == 0:
                         # This is basically a different version of apply_in_batches but using the "new" prepare_backward interface
                         # for evaluating the test data. Maybe we should refactor this at some point and / or apply_in_batches
                         # is not really needed anymore as its own function?
@@ -252,16 +300,12 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
                         self.eval()
 
                         test_metrics = {}
-                        x_tensor_test = torch.tensor(self.x_test)
-                        y_tensor_test = torch.tensor(self.y_test)
-
-                        dataset = TransformTensorDataset(x_tensor_test,y_tensor_test, transform=None)
-                        test_loader = torch.utils.data.DataLoader(dataset, batch_size = self.batch_size)
+                        test_loader = torch.utils.data.DataLoader(self.test_data, **self.loader_cfg)
                         
                         for batch in test_loader:
                             test_data = batch[0]
                             test_target = batch[1]
-                            test_data, test_target = test_data.cuda(), test_target.cuda()
+                            test_data, test_target = test_data.to(self.device), test_target.to(self.device)
                             test_data, test_target = Variable(test_data), Variable(test_target)
                             with torch.no_grad():
                                 backward = self.prepare_backward(test_data, test_target)
@@ -271,8 +315,8 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
 
                         self.train()
                         for key,val in test_metrics.items():
-                            out_dict["test_" + key] = val / len(self.y_test)
-                            mstr += "test {} {:2.4f} ".format(key, val / len(self.y_test))
+                            out_dict["test_" + key] = val / len(test_loader.dataset)
+                            mstr += "test {} {:2.4f} ".format(key, val / len(test_loader.dataset))
                     
                     desc = '[{}/{}] {}'.format(epoch, self.epochs-1, mstr)
                     pbar.set_description(desc)
@@ -281,7 +325,10 @@ class SKLearnBaseModel(nn.Module, BaseEstimator, ClassifierMixin):
                     out_file_content = json.dumps(out_dict, sort_keys=True) + "\n"
                     outfile.write(out_file_content)
 
-class SKEnsemble(SKLearnBaseModel):
+            if hasattr(train_loader.dataset, "end_of_epoch"):
+                train_loader.dataset.end_of_epoch()
+
+class Ensemble(BaseModel):
     def __init__(self, n_estimators = 5, combination_type = "average", *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.combination_type = combination_type
@@ -290,16 +337,24 @@ class SKEnsemble(SKLearnBaseModel):
         assert self.n_estimators > 0, "Your ensemble should have at-least one member, but self.n_estimators was {}".format(self.n_estimators)
         assert self.combination_type  in ('average', 'softmax', 'best'), "Combination type must be one of ('average', 'softmax', 'best')"
 
+    def restore_state(checkpoint):
+        super().restore_state(checkpoint)
+        self.combination_type = checkpoint["combination_type"]
+        self.n_estimators = checkpoint["n_estimators"]
+
+    def get_state(self):
+        state = super().get_state()
+        return {
+            **state,
+            "combination_type":self.combination_type,
+            "n_estimators":self.n_estimators
+        }
+
     def forward(self, X):
         return self.forward_with_base(X)[0]
 
     # @torch.jit.script
     def forward_with_base(self, X):
-        # base_preds = []
-        # for i in torch.range(start=0,end=5):
-        #     base_preds.append(self.estimators_[i](X)) 
-
-        # # base_preds = [self.estimators_[i](X) for i in torch.range(self.n_estimators)] #self.n_estimators
         base_preds = [e(X) for e in self.estimators_] #self.n_estimators
         # Some ensemble methods may introduce / remove new models while optimization. Thus we cannot use
         # self.n_estimators which is the (maximum) number of models in the ensemble, but not the current one
@@ -314,34 +369,24 @@ class SKEnsemble(SKLearnBaseModel):
         
         return pred_combined, base_preds
 
-    # Assumes self.estimators_ and self.estimator_weights_ exists
-    def staged_predict_proba(self, X):
-        check_is_fitted(self, ['X_', 'y_'])
-
-        if not hasattr(self, 'n_estimators'):
-            errormsg = '''staged_predict_proba was called on SKLearnBaseModel without its subclass {}
-                          beeing an ensemble (n_estimators attribute not found)!'''.format(self.__class__.__name__)
-            raise AttributeError(errormsg)
-
-        self.eval()
-
-        with torch.no_grad():
-            all_pred = None
-            for i, est in enumerate(self.estimators_):
-                y_pred = apply_in_batches(est, X, batch_size = self.batch_size)
-                
-                if all_pred is None:
-                    all_pred = 1.0/self.n_estimators*y_pred
-                else:
-                    all_pred = all_pred + 1.0/self.n_estimators*y_pred
-
-                yield all_pred*self.n_estimators/(i+1)
-
-class SKLearnModel(SKLearnBaseModel):
+class Model(BaseModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.model = self.base_estimator()
-        
+
+    def restore_state(self,checkpoint):
+        super().restore_state(checkpoint)
+        # I am not sure if model is part of the overall state_dict and thus properly loaded. 
+        # Lets go the save route and store it as well
+        self.model.load_state_dict(checkpoint["model_state_dict"])
+
+    def get_state(self):
+        state = super().get_state()
+        return {
+            **state,
+            "model_state_dict":self.model.state_dict(),
+        }   
+
     def prepare_backward(self, data, target, weights = None):
         output = self(data)
         loss = self.loss_function(output, target)
@@ -355,7 +400,7 @@ class SKLearnModel(SKLearnBaseModel):
             "metrics" :
             {
                 "loss" : loss.detach(),
-                "accuracy" : 100.0*(output.argmax(1) == target).type(torch.cuda.FloatTensor)
+                "accuracy" : 100.0*(output.argmax(1) == target).type(self.get_float_type())
             } 
             
         }

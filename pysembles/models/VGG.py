@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import math
 from collections import OrderedDict
 
-from deep_ensembles_v2.Utils import Flatten
+from pysembles.Utils import Flatten
 
 class VGGNet(nn.Module):
     def __init__(self, input_size = (3,32,32), n_channels = 32, depth = 4, hidden_size = 512, p_dropout = 0.0, n_classes = 100):

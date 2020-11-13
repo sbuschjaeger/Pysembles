@@ -7,10 +7,10 @@ from sklearn.base import clone
 from torch import nn
 from tqdm import tqdm
 
-from .Models import SKEnsemble
+from .Models import Ensemble
 from .Utils import TransformTensorDataset
 
-class GNCLClassifier(SKEnsemble):
+class GNCLClassifier(Ensemble):
     """ (Generalized) Negtaive Correlation Learning.
 
     Negative Correlation Learning uses the Bias-Variance-Co-Variance decomposition to derive a regularized objective function which enforces the diversity among the ensemble. 
@@ -54,6 +54,17 @@ class GNCLClassifier(SKEnsemble):
             warnings.warn("You set GNCL to 'exact' but used an unsupported loss function for exact minimization. Currrently supported are MSELoss, NLLLoss, and CrossEntropyLoss. I am setting mode to 'upper' now and minimize the upper bound using the provided loss function") 
             self.mode = "upper"
 
+    def restore_state(self, checkpoint):
+        super().restore_state(checkpoint)
+        self.mode = checkpoint["mode"]
+
+    def get_state(self):
+        state = super().get_state()
+        return {
+            **state,
+            "mode":self.mode,
+        } 
+
     def prepare_backward(self, data, target, weights = None):
         # TODO Make this use of the weights as well!
         f_bar, base_preds = self.forward_with_base(data)
@@ -73,7 +84,7 @@ class GNCLClassifier(SKEnsemble):
                 n_classes = f_bar.shape[1]
                 n_preds = f_bar.shape[0]
                 D = torch.eye(n_classes).repeat(n_preds, 1, 1).cuda()
-                target_one_hot = torch.nn.functional.one_hot(target, num_classes = n_classes).type(torch.cuda.FloatTensor)
+                target_one_hot = torch.nn.functional.one_hot(target, num_classes = n_classes).type(self.get_float_type())
 
                 eps = 1e-7
                 diag_vector = target_one_hot*(1.0/(f_bar**2+eps))
@@ -107,7 +118,7 @@ class GNCLClassifier(SKEnsemble):
                 reg_loss = 1.0/self.n_estimators * self.l_reg * f_loss + (1.0 - self.l_reg)/self.n_estimators * i_loss
             
             losses.append(reg_loss)
-            accuracies.append(100.0*(pred.argmax(1) == target).type(torch.cuda.FloatTensor))
+            accuracies.append(100.0*(pred.argmax(1) == target).type(self.get_float_type()))
             diversity.append(div)
 
         losses = torch.stack(losses, dim = 1)
@@ -121,7 +132,7 @@ class GNCLClassifier(SKEnsemble):
             "metrics" :
             {
                 "loss" : f_loss,
-                "accuracy" : 100.0*(f_bar.argmax(1) == target).type(torch.cuda.FloatTensor), 
+                "accuracy" : 100.0*(f_bar.argmax(1) == target).type(self.get_float_type()), 
                 "avg loss": losses.mean(dim=1),
                 "avg accuracy": accuracies.mean(dim = 1),
                 "diversity": diversity.sum(dim = 1)

@@ -220,7 +220,7 @@ class MobileNetV3(nn.Module):
             ]
         first_channels_num = 16
 
-        # last_channels_num = 1280
+        #last_channels_num = 1280
         # according to https://github.com/tensorflow/models/blob/master/research/slim/nets/mobilenet/mobilenet_v3.py
         # if small -- 1024, if large -- 1280
         last_channels_num = 1280 if mode == 'large' else 1024

@@ -16,14 +16,25 @@ from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import accuracy_score
 
-from .Models import SKEnsemble
+from .Models import Ensemble
 from .Utils import apply_in_batches, cov, TransformTensorDataset#, weighted_mse_loss, weighted_squared_hinge_loss
 
-class SnapshotEnsembleClassifier(SKEnsemble):
+class SnapshotEnsembleClassifier(Ensemble):
     def __init__(self, list_of_snapshots, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.list_of_snapshots = list_of_snapshots
         self.estimators_ = nn.ModuleList([ self.base_estimator() ])
+
+    def restore_state(self, checkpoint):
+        super().restore_state(checkpoint)
+        self.list_of_snapshots = checkpoint["list_of_snapshots"]
+
+    def get_state(self):
+        state = super().get_state()
+        return {
+            **state,
+            "list_of_snapshots":self.list_of_snapshots,
+        }
 
     def prepare_backward(self, data, target, weights = None):
         if self.cur_epoch in self.list_of_snapshots and self.batch_cnt == 0 and len(self.estimators_) < self.n_estimators:
@@ -58,7 +69,7 @@ class SnapshotEnsembleClassifier(SKEnsemble):
                 iloss *= weights 
 
             losses.append(iloss.detach())
-            accuracies.append(100.0*(pred.argmax(1) == target).type(torch.cuda.FloatTensor))
+            accuracies.append(100.0*(pred.argmax(1) == target).type(self.get_float_type()))
 
         avg_losses = torch.stack(losses, dim = 1).mean(dim = 1)
         avg_accuracy = torch.stack(accuracies, dim = 1).mean(dim = 1)
@@ -69,7 +80,7 @@ class SnapshotEnsembleClassifier(SKEnsemble):
             "metrics" :
             {
                 "loss" : loss,
-                "accuracy" : 100.0*(f_bar.argmax(1) == target).type(torch.cuda.FloatTensor), 
+                "accuracy" : 100.0*(f_bar.argmax(1) == target).type(self.get_float_type()), 
                 "avg loss": avg_losses,
                 "avg accuracy": avg_accuracy
             } 

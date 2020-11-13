@@ -4,10 +4,10 @@ import warnings
 import torch
 from torch import nn
 
-from .Models import SKEnsemble
+from .Models import Ensemble
 
 
-class SMCLClassifier(SKEnsemble):
+class SMCLClassifier(Ensemble):
     """ Stochastic Multiple Choice Learning Classifier.
 
     As often argued, diversity might be important for ensembles to work well. Stochastic Multiple Choice Learning (SMCL)
@@ -45,7 +45,7 @@ class SMCLClassifier(SKEnsemble):
                 iloss = self.loss_function(pred, target) * weights[:,i].cuda()
 
             losses.append(iloss)
-            accuracies.append(100.0*(pred.argmax(1) == target).type(torch.cuda.FloatTensor))
+            accuracies.append(100.0*(pred.argmax(1) == target).type(self.get_float_type()))
 
         losses = torch.stack(losses, dim = 1)
         lmin, _ = losses.min(dim=1)
@@ -57,7 +57,7 @@ class SMCLClassifier(SKEnsemble):
             "metrics" :
             {
                 "loss" : self.loss_function(f_bar, target),
-                "accuracy" : 100.0*(f_bar.argmax(1) == target).type(torch.cuda.FloatTensor), 
+                "accuracy" : 100.0*(f_bar.argmax(1) == target).type(self.get_float_type()), 
                 "avg loss": losses.mean(dim=1),
                 "avg accuracy": accuracies.mean(dim = 1),
             } 
