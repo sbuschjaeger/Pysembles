@@ -13,8 +13,6 @@ Currently, supported are:
 
 For reference, we also provide some common architectures as base learners, including
 
-- DenseNet
-- EfficientNet
 - MobileNetV3
 - ResNet and SimpleResNet
 - VGG
@@ -25,8 +23,6 @@ Last, this code also contains some random stuff including
 - Autoencoders
 - Soft Decision Trees
 - Binarized Neural Networks. Many thanks to Mikail Yayla (mikail.yayla@tu-dortmund.de) for providing CUDA kernels for BNN training. He maintains a more evolved repository on BNNs - check it out at https://github.com/myay/BFITT
-
-**Note:** I was lazy during the implementation and used `cuda()` quite a lot in various places. Thus, it is likely that this code will not run a cpu immediately. 
 
 ## How to use this code
 
@@ -42,7 +38,7 @@ models / setting parameters. I tried to comment as much code as possible, so ple
 - [ ] General cleanup
 - [ ] Add more comments
 - [ ] Use skorch? (https://github.com/skorch-dev/skorch)
-- [ ] Check for cuda and call `cuda()` appropriately
+- [X] Check for cuda and call `cuda()` appropriately
 
 ## Citing our Paper
 

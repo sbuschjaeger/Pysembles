@@ -13,7 +13,8 @@ from tqdm import tqdm
 
 from sklearn.utils.validation import check_is_fitted
 from sklearn.utils.multiclass import unique_labels
-from sklearn.metrics import accuracy_score
+from pysembles.Metrics import avg_accurcay,diversity,avg_loss,loss
+from pysembles.Utils import pytorch_total_params, apply_in_batches, TransformTensorDataset
 
 from .Utils import store_model, TransformTensorDataset, apply_in_batches
 
@@ -32,7 +33,8 @@ class BaseModel(nn.Module):
                     store_every = None,
                     device = "cuda",
                     loader = None,
-                    use_amp = False
+                    use_amp = False,
+                    *args,**kwargs
                 ) :
         super().__init__()
         
@@ -118,13 +120,13 @@ class BaseModel(nn.Module):
         self.scaler.load_state_dict(checkpoint['scaler_state_dict'])
 
         if self.seed is not None:
-            np.random.seed(seed)
-            random.seed(seed)
-            torch.manual_seed(seed)
+            np.random.seed(self.seed)
+            random.seed(self.seed)
+            torch.manual_seed(self.seed)
             # if you are using GPU
             if self.device != "cpu": 
-                torch.cuda.manual_seed(seed)
-                torch.cuda.manual_seed_all(seed)
+                torch.cuda.manual_seed(self.seed)
+                torch.cuda.manual_seed_all(self.seed)
         
         self.load_state_dict(checkpoint['state_dict'])
 
@@ -218,7 +220,7 @@ class BaseModel(nn.Module):
                         data = batch
                     else:
                         data = batch[0]
-
+                    
                     data = data.to(self.device)
                     data = Variable(data)
 
@@ -337,7 +339,7 @@ class Ensemble(BaseModel):
         assert self.n_estimators > 0, "Your ensemble should have at-least one member, but self.n_estimators was {}".format(self.n_estimators)
         assert self.combination_type  in ('average', 'softmax', 'best'), "Combination type must be one of ('average', 'softmax', 'best')"
 
-    def restore_state(checkpoint):
+    def restore_state(self, checkpoint):
         super().restore_state(checkpoint)
         self.combination_type = checkpoint["combination_type"]
         self.n_estimators = checkpoint["n_estimators"]
@@ -416,12 +418,11 @@ class Model(BaseModel):
             # iterate over the children, which does not work as nicely if there is alreay a problem in a single child. 
             # TODO: We should enhance this, e.g. by recursivley executing children (lol, that sounds weird)
             if hasattr(self.model, "layers_"):
-                layers = self.layers_
+                layers = self.model.layers_
             else:
                 layers = self.model.children()
                 
             for l in layers:
-                print(l)
                 print("IN: ", x.shape)
                 x = l(x)
                 print("OUT: ", x.shape, " \n")

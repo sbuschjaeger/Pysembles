@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 from torch.utils.cpp_extension import BuildExtension, CUDAExtension, CUDA_HOME
 
 modules= []
@@ -19,7 +19,7 @@ setup(name='Pysembles',
       author=u'Sebastian Buschjäger',
       author_email='sebastian.buschjaeger@tu-dortmund.de',
       license='MIT',
-      packages=['pysembles'],
+      packages=find_packages(),
       zip_safe=False,
       install_requires = [
             'torch'

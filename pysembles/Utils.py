@@ -17,7 +17,7 @@ from torch.autograd import Variable
 import torchvision
 import torchvision.transforms as transforms
 
-from .models.BinarisedNeuralNetworks import binarize, BinaryTanh, BinaryLinear, BinaryConv2d, Scale
+from pysembles.models.BinarisedNeuralNetworks import binarize, BinaryTanh, BinaryLinear, BinaryConv2d, Scale
 
 # This function can be used as a scoring metric to score the number of parameters
 def pytorch_total_params(model):

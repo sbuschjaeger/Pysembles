@@ -14,9 +14,9 @@ from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import accuracy_score
 
-from .Models import Model
+from .Models import Model, Ensemble
 
-class StackingClassifier(Model):
+class StackingClassifier(Model, Ensemble):
     """ Stacking Classifier.
 
     Stacking stacks the predictions of each base learner into one large vector and then trains another model on this new

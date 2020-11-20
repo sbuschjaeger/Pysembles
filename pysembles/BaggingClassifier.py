@@ -22,11 +22,11 @@ class BootstrapSampler(Sampler):
         self.bootstrap = bootstrap
         self.frac_examples = frac_examples
         
-        np.random.seed(seed + idx)
+        np.random.seed(seed)
         idx_array = [i for i in range(N)]
         self.idx_sampled = np.random.choice(
             idx_array, 
-            size=int(self.frac_samples*len(idx_array)), 
+            size=int(self.frac_examples*len(idx_array)), 
             replace=self.bootstrap
         )
 
@@ -46,7 +46,7 @@ class WeightedDataset(Dataset):
         items = self.dataset[index]
         weights = self.w_tensor[index]
 
-        return items, weights
+        return (*items, weights)
 
     def __len__(self):
         return len(self.dataset)
@@ -72,7 +72,7 @@ class BaggingClassifier(Ensemble):
     - Webb, G. I. (2000). MultiBoosting: a technique for combining boosting and wagging. Machine Learning. https://doi.org/10.1023/A:1007659514849
     - Oza, N. C., & Russell, S. (2001). Online Bagging and Boosting. Retrieved from https://ti.arc.nasa.gov/m/profile/oza/files/ozru01a.pdf 
     """
-    def __init__(self, bootstrap = True, frac_examples = 1.0, freeze_layers = None, train_method = "fast bagging", *args, **kwargs):
+    def __init__(self, bootstrap = True, frac_examples = 1.0, train_method = "fast bagging", *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.frac_samples = frac_examples
         self.bootstrap = bootstrap
@@ -84,7 +84,6 @@ class BaggingClassifier(Ensemble):
 
     def restore_state(self, checkpoint):
         super().restore_state(checkpoint)
-        self.frac_samples = checkpoint["frac_samples"]
         self.bootstrap = checkpoint["bootstrap"]
         self.train_method = checkpoint["train_method"]
 
@@ -92,7 +91,6 @@ class BaggingClassifier(Ensemble):
         state = super().get_state()
         return {
             **state,
-            "list_of_snapshots":self.list_of_snapshots,
             "frac_samples":self.frac_samples,
             "train_method":self.train_method
         } 
@@ -111,7 +109,7 @@ class BaggingClassifier(Ensemble):
             else:
             # TODO: PyTorch copies the weight vector if we use weights[:,i] to index
             #       a specific row. Maybe we should re-factor this?
-                iloss = self.loss_function(pred, target) * weights[:,i].to(self.get_float_type())
+                iloss = self.loss_function(pred, target) * weights[:,i].type(self.get_float_type())
 
             losses.append(iloss)
             accuracies.append(100.0*(pred.argmax(1) == target).type(self.get_float_type()))
@@ -152,11 +150,11 @@ class BaggingClassifier(Ensemble):
                 Model(training_file="training_{}.jsonl".format(i), *self.args, **self.kwargs) for i in range(self.n_estimators)
             ])
 
-            if self.train == "wagging":
-                w_tensor = -torch.log( torch.randint(low=1,high=1000, size=(len(y), self.n_estimators)) / 1000.0 )
+            if self.train_method == "wagging":
+                w_tensor = -torch.log( torch.randint(low=1,high=1000, size=(len(data), self.n_estimators)) / 1000.0 )
                 w_dataset = WeightedDataset(data, w_tensor)
                 super().fit(w_dataset)
             else:
-                w_tensor = torch.poisson(torch.ones(size=(len(y), self.n_estimators)))
+                w_tensor = torch.poisson(torch.ones(size=(len(data), self.n_estimators)))
                 w_dataset = WeightedDataset(data, w_tensor)
                 super().fit(w_dataset)

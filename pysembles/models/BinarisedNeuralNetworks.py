@@ -133,6 +133,7 @@ class BinaryModel(nn.Module):
 
         self.model = convert_layers(model, keep_activation, copy_init)
         self.include_scale = include_scale
+        
         # This has some rather crude assumptions. Lets see how they work out. 
         # First, we assume that the first module is either the network itself (e.g. VGGNet) or it is
         # an nn.Sequential. Second, we assume that modules() will provide a list of all layers and we do not

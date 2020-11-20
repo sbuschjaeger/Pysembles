@@ -23,22 +23,34 @@ class BasicBlock(nn.Module):
         return nn.functional.max_pool2d(out, kernel_size=2,stride=2)
 
 class SimpleResNet(nn.Module):
-    def __init__(self, n_channels = 64, depth = 2, num_classes = 100):
+    def __init__(self, in_channels = 1, n_channels = 64, depth = 2, num_classes = 100):
         super().__init__()
         
-        if depth == 1:
-            lin_size = 128*n_channels
-        elif depth == 2:
-            lin_size = 64*n_channels
-        elif depth == 3:
-            lin_size = 16*n_channels
-        elif depth == 4:
-            lin_size = 4*n_channels
+        if in_channels == 3:
+            if depth == 1:
+                lin_size = 128*n_channels
+            elif depth == 2:
+                lin_size = 64*n_channels
+            elif depth == 3:
+                lin_size = 16*n_channels
+            elif depth == 4:
+                lin_size = 4*n_channels 
+            else:
+                lin_size = n_channels
         else:
-            lin_size = n_channels
-
+            if depth == 1:
+                lin_size = 128*n_channels
+            elif depth == 2:
+                lin_size = 64*n_channels
+            elif depth == 3:
+                lin_size = 16*n_channels
+            elif depth == 4:
+                lin_size = 1*n_channels 
+            else:
+                lin_size = n_channels
+                
         model = [
-            nn.Conv2d(3,n_channels,kernel_size=3, padding=1, stride = 1, bias=True),
+            nn.Conv2d(in_channels,n_channels,kernel_size=3, padding=1, stride = 1, bias=True),
             nn.BatchNorm2d(n_channels),
             nn.ReLU()
         ]

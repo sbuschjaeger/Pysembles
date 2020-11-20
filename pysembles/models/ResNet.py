@@ -8,21 +8,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from deep_ensembles_v2.BinarisedNeuralNetworks import BinaryConv2d, BinaryLinear, BinaryTanh
-
 class BasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, in_planes, planes, stride=1, block_type = "float"):
+    def __init__(self, in_planes, planes, stride=1):
         super(BasicBlock, self).__init__()
-        if block_type == "binary":
-            ConvLayer = BinaryConv2d
-            LinearLayer = BinaryLinear
-            Activation = BinaryTanh
-        else:
-            ConvLayer = nn.Conv2d
-            LinearLayer = nn.Linear
-            Activation = nn.ReLU
+        ConvLayer = nn.Conv2d
+        LinearLayer = nn.Linear
+        Activation = nn.ReLU
 
         self.conv1 = ConvLayer(in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(planes)
@@ -50,17 +43,12 @@ class BasicBlock(nn.Module):
 class Bottleneck(nn.Module):
     expansion = 4
 
-    def __init__(self, in_planes, planes, stride=1, block_type = "float"):
+    def __init__(self, in_planes, planes, stride=1):
         super(Bottleneck, self).__init__()
 
-        if block_type == "binary":
-            ConvLayer = BinaryConv2d
-            LinearLayer = BinaryLinear
-            Activation = BinaryTanh
-        else:
-            ConvLayer = nn.Conv2d
-            LinearLayer = nn.Linear
-            Activation = nn.ReLU
+        ConvLayer = nn.Conv2d
+        LinearLayer = nn.Linear
+        Activation = nn.ReLU
 
         self.conv1 = ConvLayer(in_planes, planes, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm2d(planes)
@@ -91,17 +79,12 @@ class Bottleneck(nn.Module):
 
 
 class ResNet(nn.Module):
-    def __init__(self, block, num_blocks, num_classes=100, model_type = "float"):
+    def __init__(self, block, num_blocks, num_classes=100):
         super(ResNet, self).__init__()
 
-        if model_type == "binary":
-            ConvLayer = BinaryConv2d
-            LinearLayer = BinaryLinear
-            Activation = BinaryTanh
-        else:
-            ConvLayer = nn.Conv2d
-            LinearLayer = nn.Linear
-            Activation = nn.ReLU
+        ConvLayer = nn.Conv2d
+        LinearLayer = nn.Linear
+        Activation = nn.ReLU
 
         self.in_planes = 64
 

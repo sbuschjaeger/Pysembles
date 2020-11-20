@@ -210,10 +210,10 @@ class MobileNetV3(nn.Module):
                 [3, 72, 24, False, 'RE', 2],
                 [3, 88, 24, False, 'RE', 1],
                 [5, 96, 40, True, 'HS', 2],
-                [5, 240, 40, True, 'HS', 1],
-                [5, 240, 40, True, 'HS', 1],
-                [5, 120, 48, True, 'HS', 1],
-                [5, 144, 48, True, 'HS', 1],
+                [5, 120, 40, True, 'HS', 1],
+                [5, 120, 40, True, 'HS', 1],
+                [5, 60, 48, True, 'HS', 1],
+                [5, 72, 48, True, 'HS', 1],
                 # [5, 288, 96, True, 'HS', 2],
                 # [5, 576, 96, True, 'HS', 1],
                 # [5, 576, 96, True, 'HS', 1]
@@ -223,7 +223,12 @@ class MobileNetV3(nn.Module):
         #last_channels_num = 1280
         # according to https://github.com/tensorflow/models/blob/master/research/slim/nets/mobilenet/mobilenet_v3.py
         # if small -- 1024, if large -- 1280
-        last_channels_num = 1280 if mode == 'large' else 1024
+        if mode == "large":
+            last_channels_num = 1280 
+        elif mode == "small":
+            last_channels_num = 1024
+        else:
+            last_channels_num = 512 
 
         divisor = 8
 
