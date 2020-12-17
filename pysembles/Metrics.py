@@ -79,6 +79,18 @@ def loss(model, data_loader):
     
     return np.mean(losses)
 
+def predict_proba(model, data_loader):
+    preds = []
+    for batch in data_loader:
+        data, target = batch[0], batch[1]
+        data, target = data.cuda(), target.cuda()
+        data, target = Variable(data), Variable(target)
+        with torch.no_grad():
+            pred = model(data)
+            preds.append(pred.detach().cpu().numpy())
+
+    return np.concatenate(preds,axis=0)
+
 def avg_loss(model, data_loader):
     if not hasattr(model, "estimators_"):
         return 0
