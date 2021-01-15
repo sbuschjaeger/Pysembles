@@ -27,6 +27,8 @@ class SimpleResNet(nn.Module):
         super().__init__()
         
         if lin_size is None:
+            # Try to guess the size of the final linear layer. This probably only works for CIFAR images
+            # or similar sizes
             if in_channels == 3:
                 if depth == 1:
                     lin_size = 128*n_channels

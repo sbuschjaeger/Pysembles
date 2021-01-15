@@ -107,8 +107,9 @@ class BaggingClassifier(Ensemble):
             if weights is None:
                 iloss = self.loss_function(pred, target)
             else:
-            # TODO: PyTorch copies the weight vector if we use weights[:,i] to index
-            #       a specific row. Maybe we should re-factor this?
+                # TODO: PyTorch copies the weight vector if we use weights[:,i] to index
+                #       a specific row. Maybe we should re-factor this?
+                #tmp = self.loss_function(pred, target)
                 iloss = self.loss_function(pred, target) * weights[:,i].type(self.get_float_type())
 
             losses.append(iloss)

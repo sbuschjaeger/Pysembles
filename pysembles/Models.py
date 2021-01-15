@@ -80,13 +80,13 @@ class BaseModel(nn.Module):
         self.use_amp = use_amp
         
         if self.seed is not None:
-            np.random.seed(seed)
-            random.seed(seed)
-            torch.manual_seed(seed)
+            np.random.seed(self.seed)
+            random.seed(self.seed)
+            torch.manual_seed(self.seed)
             # if you are using GPU
             if self.device != "cpu":
-                torch.cuda.manual_seed(seed)
-                torch.cuda.manual_seed_all(seed)
+                torch.cuda.manual_seed(self.seed)
+                torch.cuda.manual_seed_all(self.seed)
 
     def get_float_type(self):
         if self.device == "cpu":
@@ -424,6 +424,8 @@ class Model(BaseModel):
                 
             for l in layers:
                 print("IN: ", x.shape)
+                if isinstance(l, (nn.Linear, nn.Conv1d, nn.Conv2d, nn.Conv3d)):
+                    print("WEIGHTS: ", l.weight.shape)
                 x = l(x)
                 print("OUT: ", x.shape, " \n")
             raise e
