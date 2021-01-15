@@ -13,6 +13,7 @@ from tqdm import tqdm
 
 from sklearn.utils.validation import check_is_fitted
 from sklearn.utils.multiclass import unique_labels
+from sklearn.metrics import roc_auc_score
 from pysembles.Metrics import avg_accurcay,diversity,avg_loss,loss
 from pysembles.Utils import pytorch_total_params, apply_in_batches, TransformTensorDataset
 
@@ -396,13 +397,23 @@ class Model(BaseModel):
         if weights is not None:
             loss = loss * weights
 
+        np_target = target.detach().cpu().numpy()
+        np_output = output.detach().cpu().numpy()
+        roc_aucs = []
+        for i in range(output.shape[1]):
+            try:
+                roc_aucs.append(roc_auc_score(np_target[:, i], np_output[:, i]) * output.shape[0])
+            except:
+                roc_aucs.append(1 * output.shape[0])
+
         d = {
             "prediction" : output, 
             "backward" : loss, 
             "metrics" :
             {
                 "loss" : loss.detach(),
-                "accuracy" : 100.0*(output.argmax(1) == target).type(self.get_float_type())
+                "rocauc": np.mean(roc_aucs)
+                #"accuracy" : 100.0*(output.argmax(1) == target).type(self.get_float_type())
             } 
             
         }
