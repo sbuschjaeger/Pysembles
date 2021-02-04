@@ -20,7 +20,21 @@ from .Models import Ensemble
 
 class GradientBoostedNets(Ensemble):
     ''' (Stochastic) Gradient Boosting for Neural Networks
-    Gradient Boosting sequentially trains a classifier
+    Gradient Boosting sequentially trains a classifier on the residuals of the ensemble. In its most basic form this is usually a stagewise process in which a new classifier is trained in each stage / round [1]. Related Boosting algorithms like AdaBoost can also be viewed in this framework [2,3]. In order to speed-up the training process, Stochastic Gradient boosting [4] has been proposed. Stochastic Gradient Boosting trains the individual classifiers in each round on a random sample of the entire dataset. This implementation is a variation of this process and combines it with Stochastic Gradient Descent. The basic idea is to freeze the weights of individual models \( h^1,\dots, h^{i-1} \) and perform SGD on the i-th model's parameter using \( \ell(\\frac{1}{M}\sum_{j=1}^i h^j(x), y) \). This process is repeated for each model.
+
+    As far as I know this specific training has not been discussed in literature so far, but there is some significant overlap with exsiting work. See e.g. [5] and references therein. 
+
+    __References__
+
+    [1] Friedman, J. H. (2001). Greedy Function Approximation: A Gradient Boosting Machine. Retrieved from https://www.jstor.org/stable/pdf/2699986.pdf?seq=1
+    
+    [2] Mason, L., Baxter, J., Bartlet, P., & Frean, M. (1999). Boosting Algorithms as Gradient Descent in Function Space. Retrieved from http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.51.6893&rep=rep1&type=pdf
+
+    [3] Schapire, R. E., & Freund, Y. (2012). Boosting: Foundations and algorithms. MIT press.
+
+    [4] Friedman, J. H. (1999). Stochastic Gradient Boosting, 1(3), 1–10. Retrieved from http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.31.1666&rep=rep1&type=pdf
+
+    [5] Hu, H., Sun, W., Venkatraman, A., Hebert, M., & Bagnell, J. A. (2017). Gradient Boosting on Stochastic Data Streams, 54. Retrieved from https://arxiv.org/pdf/1703.00377.pdf
 
     '''
     def __init__(self, *args, **kwargs):

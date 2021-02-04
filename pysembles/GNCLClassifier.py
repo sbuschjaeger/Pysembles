@@ -10,44 +10,64 @@ from tqdm import tqdm
 from .Models import Ensemble
 from .Utils import TransformTensorDataset
 
-class GNCLClassifier(Ensemble):
-    """ (Generalized) Negative Correlation Learning.
-
-    Negative Correlation Learning uses the Bias-Variance-Co-Variance decomposition to derive a regularized objective function which enforces diversity among the ensemble members. The first appearance of this work was for the MSE loss in [1,2]. A modern application to the problem of crowd counting can be found in [4]. Optiz later proposed a similar loss using the Cross Entropy Loss, but without theoretical justifications [3]. Webb et al. in [5,6] gave more theoretical background to using the Cross Entropy Loss. Note that [6] is basically a shorter version of [5].
-
-    We generalized and unified the previous works to include _any_ loss function using a second order Taylor approximation. As detailed in our paper, there is an upper bound for the GNCL objective which does not compute the exact diversity term. Thus, __any__ differentiable loss \( \ell \) function can be used for optimization. Let \( f(x) \) be the ensembles prediction consisting of M models \( h^1, \dots, h^M \):
-
-    $$
+'''
+ $$
     \frac{1}{N}\sum_{j=1}^N \left( \lambda \ell(f(x_j),y_j) + \frac{1-\lambda}{M}\sum_{i=1}^M \ell(h^i(x_j),y_j) \right)
     $$
     where \( \lambda \in [0,1] \) is the trade-off between the ensemble's performance and its diversity, 
 
     If you are interested in explicitly computing the diversity we currently supports three loss functions: MSE, Negative Log-Likelihood and CrossEntropy. Here 
-    
+
     $$
     \frac{1}{M} \sum_{i=1}^M \ell(h^i) - \frac{\lambda}{2M} \sum_{i=1}^M {d_i}^T D d_i
     $$
-    where $D = \nabla^2_{f(x)}\ell(f(x), y)$ and $d_i = (h^i(x) - f(x))$ is optimized. 
+
+    where $D = \nabla^2_{f(x)}\ell(f(x), y)$ and $d_i = (h^i(x) - f(x))$ is optimized. '''
+
+class GNCLClassifier(Ensemble):
+    """(Generalized) Negative Correlation Learning.
+
+    Negative Correlation Learning uses the Bias-Variance-Co-Variance decomposition to derive a regularized objective function which enforces diversity among the ensemble members. The first appearance of this work was for the MSE loss in [1,2]. A modern application to the problem of crowd counting can be found in [4]. Optiz later proposed a similar loss using the Cross Entropy Loss, but without theoretical justifications [3]. Webb et al. in [5,6] gave more theoretical background to using the Cross Entropy Loss. Note that [6] is basically a shorter version of [5].
+
+    We generalized and unified the previous works to include _any_ loss function using a second order Taylor approximation. As detailed in our paper, there is an upper bound for the GNCL objective which does not compute the exact diversity term. Thus, __any__ differentiable loss \( \ell \) function can be used for optimization. We will refer to this mode as `upper`. Let \( f(x) \) be the ensembles prediction consisting of M models \( h^1, \dots, h^M \), then 
+
+    $$
+        \\frac{1}{N}\sum_{j=1}^N \lambda \ell(f(x_j),y_j) + \\frac{1-\lambda}{M}\sum_{i=1}^M \ell(h^i(x_j),y_j)
+    $$
+    where \( \lambda \in [0,1] \) is the trade-off between the ensemble's performance and its diversity, 
+
+    If you are interested in explicitly computing the diversity we currently supports three loss functions: MSE, Negative Log-Likelihood and CrossEntropy. We call this mode `exact`:
+    $$
+        \\frac{1}{M} \sum_{i=1}^M \ell(h^i) - \\frac{\lambda}{2M} \sum_{i=1}^M {d_i}^T D d_i
+    $$
+    where \( D = \\nabla^2_{f(x)}\ell(f(x), y), d_i = (h^i(x) - f(x))\) is optimized.
 
     The main reasons for this are twofold: First, we manually have to compute the hessian for every loss function which is a lot of work. Second, PyTorchs autograd functionality does not directly support a hessian (or even gradients) on a "per example" basis, but only summed over a batch. So far I have not found a way to use autograd efficiently here. 
-        
+                
     Attributes:
         n_estimators (int): Number of estimators in ensemble. Should be at least 1
+        
         l_reg (float): Trade-off between diversity and loss. Should be between 0 and 1. l_reg = 0 implies independent training whereas l_reg = 1 implies no independent training
 
+        mode (str): The mode used for fitting a new model. 
+            
+            - `mode != "exact"`: The upper bound is used for fitting. 
+            - `mode` == "exact"`: The diversity is explicity computed and used for fitting. Only MSE, Negative Log-Likelihood and CrossEntropy loss are supported
+
     __References__
-        [1] Liu, Y., & Yao, X. (1999). Ensemble learning via negative correlation. Neural Networks, 12(10), 1399–1404. https://doi.org/10.1016/S0893-6080(99)00073-8 
-        
-        [2] Brown, G., WatT, J. L., & Tino, P. (2005). Managing Diversity in Regression Ensembles. Jmlr, (6), 1621–1650. https://doi.org/10.1097/IYC.0000000000000008
-        
-        [3] Opitz, M., Possegger, H., & Bischof, H. (2016). Efficient model averaging for deep neural networks. Asian Conference on Computer Vision, 10112 LNCS, 205–220. https://doi.org/10.1007/978-3-319-54184-6_13
-        
-        [4] Shi, Z., Zhang, L., Liu, Y., Cao, X., Ye, Y., Cheng, M., & Zheng, G. (n.d.). Crowd Counting with Deep Negative Correlation Learning, 5382–5390. Retrieved from http://openaccess.thecvf.com/content_cvpr_2018/papers/Shi_Crowd_Counting_With_CVPR_2018_paper.pdf
-        
-        [5] Webb, A. M., Reynolds, C., Iliescu, D.-A., Reeve, H., Lujan, M., & Brown, G. (2019). Joint Training of Neural Network Ensembles, (4), 1–14. https://doi.org/10.13140/RG.2.2.28091.46880
-        
-        [6] Webb, A. M., Reynolds, C., Chen, W., Reeve, H., Iliescu, D.-A., Lujan, M., & Brown, G. (2020). To Ensemble or Not Ensemble: When does End-To-End Training Fail? In ECML PKDD 2020 (pp. 1–16). Retrieved from http://www.cs.man.ac.uk/~gbrown/publications/ecml2020webb.pdf
-    """
+
+    [1] Liu, Y., & Yao, X. (1999). Ensemble learning via negative correlation. Neural Networks, 12(10), 1399–1404. https://doi.org/10.1016/S0893-6080(99)00073-8 
+
+    [2] Brown, G., WatT, J. L., & Tino, P. (2005). Managing Diversity in Regression Ensembles. Jmlr, (6), 1621–1650. https://doi.org/10.1097/IYC.0000000000000008
+
+    [3] Opitz, M., Possegger, H., & Bischof, H. (2016). Efficient model averaging for deep neural networks. Asian Conference on Computer Vision, 10112 LNCS, 205–220. https://doi.org/10.1007/978-3-319-54184-6_13
+
+    [4] Shi, Z., Zhang, L., Liu, Y., Cao, X., Ye, Y., Cheng, M., & Zheng, G. (n.d.). Crowd Counting with Deep Negative Correlation Learning, 5382–5390. Retrieved from http://openaccess.thecvf.com/content_cvpr_2018/papers/Shi_Crowd_Counting_With_CVPR_2018_paper.pdf
+
+    [5] Webb, A. M., Reynolds, C., Iliescu, D.-A., Reeve, H., Lujan, M., & Brown, G. (2019). Joint Training of Neural Network Ensembles, (4), 1–14. https://doi.org/10.13140/RG.2.2.28091.46880
+
+    [6] Webb, A. M., Reynolds, C., Chen, W., Reeve, H., Iliescu, D.-A., Lujan, M., & Brown, G. (2020). To Ensemble or Not Ensemble: When does End-To-End Training Fail? In ECML PKDD 2020 (pp. 1–16). Retrieved from http://www.cs.man.ac.uk/~gbrown/publications/ecml2020webb.pdf
+"""
 
     def __init__(self, l_reg = 0, mode = "exact", *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -71,7 +91,7 @@ class GNCLClassifier(Ensemble):
         } 
 
     def prepare_backward(self, data, target, weights = None):
-        # TODO Make this use of the weights as well!
+        # TODO Make use of the weights as well!
         f_bar, base_preds = self.forward_with_base(data)
         
         if self.mode == "upper":
