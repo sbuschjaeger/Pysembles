@@ -80,7 +80,7 @@ class BaggingClassifier(Ensemble):
 
             - `fast bagging` (or any other string which is not {`bagging`, `wagging`}). Computes discrete Poisson weights which are used during fit as presented in [3]. This method can be faster for smaller base models which do not utilize the entire GPU. Moreover, we can follow the entire ensemble loss during optimization. It is important to note, that the Poisson weight is applied to the loss. The `frac_examples` and `bootstrap` parameters are ignored here.
 
-    __References:__
+    __References__
 
     [1] Breiman, L. (1996). Bagging predictors. Machine Learning. https://doi.org/10.1007/bf00058655
 
