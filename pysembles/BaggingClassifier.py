@@ -1,16 +1,11 @@
 #!/usr/bin/env python3
 
-from tqdm import tqdm
 import numpy as np
 import torch
 
 from torch import nn
-from torch.autograd import Variable
 from torch.utils.data import Sampler
 from torch.utils.data import Dataset
-
-from sklearn.utils.multiclass import unique_labels
-from sklearn.metrics import accuracy_score
 
 from .Utils import TransformTensorDataset
 from .Models import Ensemble, Model
@@ -18,10 +13,18 @@ from .Models import Ensemble, Model
 import copy
 
 class BootstrapSampler(Sampler):
+    """ Implements bootstrap sampling in PyTorch
+    Attributes:
+        N (int): The total number of training datasets
+        seed (long): The random seed
+        bootstrap (bool): If true, sample with replacement else sample without replacement
+        frac_examples (float): Fraction of training examples used for sampling N_sampled = (int) N * self.frac_examples. Must be from (0,1]. 
+    """
     def __init__(self, N, seed = 12345, bootstrap = True, frac_examples = 1.0):
         self.bootstrap = bootstrap
         self.frac_examples = frac_examples
-        
+        assert self.frac_samples > 0 and self.frac_samples <= 1.0, "frac_examples expects the fraction of samples used, this must be between (0,1]. It was {}".format(self.frac_samples)
+
         np.random.seed(seed)
         idx_array = [i for i in range(N)]
         self.idx_sampled = np.random.choice(
@@ -37,9 +40,16 @@ class BootstrapSampler(Sampler):
         return len(self.idx_sampled)
 
 class WeightedDataset(Dataset):
+    """ A weighted dataset in PyTorch. Each example / target pair in the dataset receives a pre-computed weight. The dataset and the weight tensor should have the same length len(dataset) == len(w_tensor)
+    
+    Attributes:
+        dataset: The original dataset
+        w_tensor: A tensor of weights.
+    """
     def __init__(self, dataset, w_tensor):
         self.dataset = dataset
         self.w_tensor = w_tensor
+        assert len(dataset) == len(w_tensor), "Dataset and w_tensor should have the same size in WeightedDataset but received len(dataset) = {} and len(w_tensor) = {}".format(len(dataset, len(w_tensor)))
 
     def __getitem__(self, index):
         #items = self.dataset.__getitem__(index)
@@ -54,23 +64,23 @@ class WeightedDataset(Dataset):
 class BaggingClassifier(Ensemble):
     """ Classic Bagging in the modern world of Deep Learning. 
 
-    Bagging uses different subsets of features / training points to train an ensemble of classifiers. The classic version of Bagging uses bootstrap samples which means that each base learner roughly receives 63% of the training data, whereas roughly 37% of the training data are duplicates. This lets each base model slightly overfit to their respective portion of the training data leading to a somewhat diverse ensemble. 
+    Bagging uses different subsets of features / training points to train an ensemble of classifiers [1]. The classic version of Bagging uses bootstrap samples which means that each base learner roughly receives 63% of the training data, whereas roughly 37% of the training data are duplicates. This lets each base model slightly overfit to their respective portion of the training data leading to a somewhat diverse ensemble. 
 
-    This implementation supports a few variations of bagging. Similar to SKLearn you can choose the fraction of samples with and without bootstrapping. Moreover, you can freeze all but the last layer of each base model. This simulates a form of feature sampling / feature extraction, and should be expanded in the future. Last, there is a "fast" training method which jointly trains the ensemble using poisson weights for each individual classifier. 
+    This implementation supports a few variations of bagging. Similar to SKLearn you can choose the fraction of samples with and without bootstrapping. There is also a "fast" training method which jointly trains the ensemble using Poisson weights for each individual classifier. 
 
     Attributes:
-        n_estimators (int): Number of estimators in ensemble. Should be at least 1
+        n_estimators (int): Number of estimators in the ensemble. Should be at least 1
         bootstrap (bool): If true, sampling is performed with replacement. If false, sampling is performed without replacement. Only has an effect if train_method = "bagging"
-        frac_examples (float): Fraction of training examples used per base learner, that is N_base = (int) N * self.frac_examples if N is the number of training data points. Must be from (0,1]. Only has an effect if train_method = "bagging"
+        frac_examples (float): Fraction of training examples used per base learner N_base = (int) N * self.frac_examples if N is the number of training data points. Must be from (0,1]. Only has an effect if train_method = "bagging"
         train_method (str): There are 3 modes:
-            - "bagging": The "regular" bagging-style training approach in which we compute bootstrap samples and train each estimators individually on its respective sample. This trains one model after another which might be faster if the base models are already quite large and fully utilize the GPU. The size and type of sample can be controlled via `frac_examples` and `bootstrap` parameter. Please note, that currently this mode cannot be properly restored from a ceckpoint, but re-training of the entire ensemble is necessary.  
-            - "wagging": Computes continous poisson weights which are used during fit as presented by Webb in "MultiBoosting: a technique for combining boosting and wagging. Machine Learning". This method can be faster for smaller base models which do not utilize the entire GPU than "regular" bagging because we jointly optimize over the entire ensemble. Moreover, we can follow the entire ensemble loss during SGD. Please note however, that the sample weight is applied _after_ the loss has been computed. Thus, some layers (e.g. batchnorm) will still make use of all examples. The `frac_examples` and `bootstrap` paraemters are ignored here.
-            - "fast bagging" (or any other term which is not "bagging" or "wagging"). Computes discrete poisson weights which are used during fit as presented by Oza and Russle in "Online Bagging and Boosting". This method can be faster for smaller base models which do not utilize the entire GPU than "regular" bagging because we jointly optimize over the entire ensemble. Moreover, we can follow the entire ensemble loss during SGD. Please note however, that the sample weight is applied _after_ the loss has been computed. Thus, some layers (e.g. batchnorm) will still make use of all examples. The `frac_examples` and `bootstrap` paraemters are ignored here.
+            - "bagging": The "regular" bagging-style training approach in which we compute bootstrap samples and train each estimators individually on its respective sample as presented in [1]. This trains one model after another which might be faster if the base models are already quite large and fully utilize the GPU. The size and type of sample can be controlled via `frac_examples' and `bootstrap' parameter. Please note, that currently this mode cannot be properly restored from a checkpoint.
+            - "wagging": Computes continuous Poisson weights which are used during fit as presented in [2]. This method can be faster for smaller base models which do not utilize the entire GPU. Moreover, we can follow the entire ensemble loss during optimization. It is important to note, that the Poisson weight is applied to the loss. The `frac_examples` and `bootstrap` parameters are ignored here.
+            - "fast bagging" (or any other string which is not {"bagging", "wagging"}). Computes discrete Poisson weights which are used during fit as presented in [3]. This method can be faster for smaller base models which do not utilize the entire GPU. Moreover, we can follow the entire ensemble loss during optimization. It is important to note, that the Poisson weight is applied to the loss. The `frac_examples` and `bootstrap` parameters are ignored here.
 
     References:
-    - Breiman, L. (1996). Bagging predictors. Machine Learning. https://doi.org/10.1007/bf00058655
-    - Webb, G. I. (2000). MultiBoosting: a technique for combining boosting and wagging. Machine Learning. https://doi.org/10.1023/A:1007659514849
-    - Oza, N. C., & Russell, S. (2001). Online Bagging and Boosting. Retrieved from https://ti.arc.nasa.gov/m/profile/oza/files/ozru01a.pdf 
+    [1] Breiman, L. (1996). Bagging predictors. Machine Learning. https://doi.org/10.1007/bf00058655
+    [2] Webb, G. I. (2000). MultiBoosting: a technique for combining boosting and wagging. Machine Learning. https://doi.org/10.1023/A:1007659514849
+    [3] Oza, N. C., & Russell, S. (2001). Online Bagging and Boosting. Retrieved from https://ti.arc.nasa.gov/m/profile/oza/files/ozru01a.pdf 
     """
     def __init__(self, bootstrap = True, frac_examples = 1.0, train_method = "fast bagging", *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -101,7 +111,7 @@ class BaggingClassifier(Ensemble):
         accuracies = []
         losses = []
         for i, pred in enumerate(base_preds):
-            # During training we set the weights to a poisson distribution (see below).
+            # During training we set the weights to a Poisson distribution (see below).
             # However, during testing this function might also be executed. In this case, we 
             # dont want to weight models, but use all of them equally for computing statistics.
             if weights is None:
