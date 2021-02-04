@@ -71,15 +71,21 @@ class BaggingClassifier(Ensemble):
     Attributes:
         n_estimators (int): Number of estimators in the ensemble. Should be at least 1
         bootstrap (bool): If true, sampling is performed with replacement. If false, sampling is performed without replacement. Only has an effect if train_method = "bagging"
-        frac_examples (float): Fraction of training examples used per base learner N_base = (int) N * self.frac_examples if N is the number of training data points. Must be from (0,1]. Only has an effect if train_method = "bagging"
+        frac_examples (float): Fraction of training examples used per base learner \( N\_base = (int) N * frac\_examples \) if N is the number of training data points. Must be from (0,1]. Only has an effect if train_method = "bagging"
         train_method (str): There are 3 modes:
-            - "bagging": The "regular" bagging-style training approach in which we compute bootstrap samples and train each estimators individually on its respective sample as presented in [1]. This trains one model after another which might be faster if the base models are already quite large and fully utilize the GPU. The size and type of sample can be controlled via `frac_examples' and `bootstrap' parameter. Please note, that currently this mode cannot be properly restored from a checkpoint.
-            - "wagging": Computes continuous Poisson weights which are used during fit as presented in [2]. This method can be faster for smaller base models which do not utilize the entire GPU. Moreover, we can follow the entire ensemble loss during optimization. It is important to note, that the Poisson weight is applied to the loss. The `frac_examples` and `bootstrap` parameters are ignored here.
-            - "fast bagging" (or any other string which is not {"bagging", "wagging"}). Computes discrete Poisson weights which are used during fit as presented in [3]. This method can be faster for smaller base models which do not utilize the entire GPU. Moreover, we can follow the entire ensemble loss during optimization. It is important to note, that the Poisson weight is applied to the loss. The `frac_examples` and `bootstrap` parameters are ignored here.
 
-    References:
+            - `bagging`: The "regular" bagging-style training approach in which we compute bootstrap samples and train each estimators individually on its respective sample as presented in [1]. This trains one model after another which might be faster if the base models are already quite large and fully utilize the GPU. The size and type of sample can be controlled via `frac_examples` and `bootstrap` parameter. Please note, that currently this mode cannot be properly restored from a checkpoint.
+
+            - `wagging`: Computes continuous Poisson weights which are used during fit as presented in [2]. This method can be faster for smaller base models which do not utilize the entire GPU. Moreover, we can follow the entire ensemble loss during optimization. It is important to note, that the Poisson weight is applied to the loss. The `frac_examples` and `bootstrap` parameters are ignored here.
+
+            - `fast bagging` (or any other string which is not {`bagging`, `wagging`}). Computes discrete Poisson weights which are used during fit as presented in [3]. This method can be faster for smaller base models which do not utilize the entire GPU. Moreover, we can follow the entire ensemble loss during optimization. It is important to note, that the Poisson weight is applied to the loss. The `frac_examples` and `bootstrap` parameters are ignored here.
+
+    __References:__
+
     [1] Breiman, L. (1996). Bagging predictors. Machine Learning. https://doi.org/10.1007/bf00058655
+
     [2] Webb, G. I. (2000). MultiBoosting: a technique for combining boosting and wagging. Machine Learning. https://doi.org/10.1023/A:1007659514849
+
     [3] Oza, N. C., & Russell, S. (2001). Online Bagging and Boosting. Retrieved from https://ti.arc.nasa.gov/m/profile/oza/files/ozru01a.pdf 
     """
     def __init__(self, bootstrap = True, frac_examples = 1.0, train_method = "fast bagging", *args, **kwargs):
