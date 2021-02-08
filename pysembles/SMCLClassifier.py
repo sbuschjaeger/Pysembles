@@ -14,14 +14,11 @@ class SMCLClassifier(Ensemble):
     enforces diversity by training each expert model on a subset of the training data for which it already works
     pretty well. Due to the random initialization each ensemble member is likely to perform better or worse on different
     parts of the data and thereby introducing diversity. SMCL enforces this specialization by selecting the best
-    expert (wrt. to the loss) for each example and then only updating that one expert for that example. All other experts
+    expert (wrt. to the loss) for each example and then only updates that one expert for that example. All other experts
     will never receive that example. 
 
-    Attributes:
-        n_estimators (int): Number of estimators in ensemble
-
-    References:
-        Lee, S., Purushwalkam, S., Cogswell, M., Ranjan, V., Crandall, D., & Batra, D. (2016). Stochastic multiple choice learning for training diverse deep ensembles. Advances in Neural Information Processing Systems, 1(Nips), 2127–2135. Retrieved from http://papers.nips.cc/paper/6270-stochastic-multiple-choice-learning-for-training-diverse-deep-ensembles.pdf
+    __References__
+        [1] Lee, S., Purushwalkam, S., Cogswell, M., Ranjan, V., Crandall, D., & Batra, D. (2016). Stochastic multiple choice learning for training diverse deep ensembles. Advances in Neural Information Processing Systems, 1(Nips), 2127–2135. Retrieved from http://papers.nips.cc/paper/6270-stochastic-multiple-choice-learning-for-training-diverse-deep-ensembles.pdf
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

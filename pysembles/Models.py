@@ -10,6 +10,7 @@ from torch.cuda.amp import GradScaler
 from torch.cuda.amp import autocast
 import numpy as np
 from tqdm import tqdm
+from abc import abstractmethod
 
 from sklearn.utils.validation import check_is_fitted
 from sklearn.utils.multiclass import unique_labels
@@ -20,6 +21,136 @@ from pysembles.Utils import pytorch_total_params, apply_in_batches, TransformTen
 from .Utils import store_model, TransformTensorDataset, apply_in_batches
 
 class BaseModel(nn.Module):
+    """ BaseModel
+
+    This is the BaseModel used by all classifiers in this package. This Base class provides a basic loop for fitting on a dataset and some convenience functions for storing and loading chckpoints. Each classifier is expected to provide 
+
+    - `def forward(self, X)` A fordward method which predicts / applies the model to the given batch X. Since a BaseModel inherits from nn.Module please use `self.train` distinguish between training and testing mode of a model. 
+
+    - `def prepare_backward(self, data, target, weights = None)` A method which computes the loss for calling backward as well as additional statistics, such as running accuracy. 
+
+        - `data`: This is the current data batch 
+        - `target`: This is the corresponding target batch 
+        - `weights`: This is the corresponding weights per example if required. 
+    
+        This repare_backward function should return a dictionary with three fields `prediction`, `backward` and `metrics`. The `prediction` field stores the individual predictions for the batch (in the same order). On the `backward` field PyTorch's backward is calld: 
+
+            backward = self.prepare_backward(data, target, weights)
+            loss = backward["backward"].mean()
+            loss.backward()
+
+        The `metrics` field is used to store / print metrics. Note that the prediction / loss / metrics should be given for each individual example in the batch. __Do not reduce / sum / mean the loss etc manually__. This happens automatically later on. For exampke:
+
+        d = {
+            # apply the model
+            "prediction" : self(data),  
+
+            # compute the loss
+            "backward" : self.loss_function(self(data), target), 
+
+            # Compute some metrics
+            "metrics" :
+            {
+                "loss" : self.loss_function(self(data), target).detach(), 
+                "accuracy" : 100.0*(self(data).argmax(1) == target).type(self.get_float_type()) 
+            } 
+        }
+
+    In addition, for storing and loading of checkpoints the implementing class must take care of its parameters / object. To do so it should override `restore_state` and `get_state` for loading and storing respectively. Note that thse function __must__ call the respective functions frm the base class:
+
+        def restore_state(self,checkpoint):
+            # Restore base state
+            super().restore_state(checkpoint)
+
+            # Extract and parameters from the chechpoint dictionary
+            self.my_param = checkpoint["my_param"]
+
+        def get_state(self):
+            # Get base state
+            state = super().get_state()
+            
+            return {
+                **state,
+                "my_param":self.my_param
+            } 
+        
+    This class already expects a fair amount of parameters. Thus, it is best to use `args` and `kwargs` to pass parameters down to this class. The following pattern is used as a best-practice to implement new classifier:
+
+        class MyClass(Model): 
+            def __init__(self, my_param, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.my_param
+
+    Attributes:
+        optimizer (dict): Dictionary of optimizer and its parameters. This dictionary is expected to have at-least two entries
+
+            - `method`: The actual optimizer to be used, e.g. `torch.optim.SGD`
+            - `epochs`: The number of epochs used for optimization. If this is not provided, it will be set to 1
+            
+            Any additional field will be passed to the optimizer object: 
+
+                optimizer_method = optimizer.pop("method")
+                epochs = optimizer.pop("epochs", 1)
+                the_optimizer = optimizer_method(model.parameters(), **optimizer)
+            
+            An example would be
+
+                optimizer = {
+                    "method" : torch.optim.SGD,
+                    "lr" : 1e-2,
+                    "epochs" : 150
+                }
+
+        scheduler (dict): Dictionary of learning rate scheduler and its parameters. This can be `None` if no scheduling is desired. Otherwise, its expected to contain a `method` field which is the scheduler. Any additional field will be used to create the this object
+
+                scheduler_method = scheduler.pop("method")
+                the_scheduler = scheduler_method(the_optimizer, **scheduler)
+
+            An example would be
+
+                scheduler = {
+                    "method" : torch.optim.lr_scheduler.StepLR,
+                    "step_size" : 25,
+                    "gamma": 0.5
+                }
+
+        loss_function (function): The loss function which should be minimized. Technically this class does not make use of this function, but only stores it for sub-classes.
+        
+        base_estimator (function): The (base) neural network which should be trained. Technically this class does not make use of this field, but only stores it for sub-classes.
+        
+        training_file (str, optional): Filename used to store metrics during training. Is only used if `out_path` is not None. Defaults to "trainings.jsonl"
+        
+        seed (long): Random seed for involved in any randomization process
+        
+        verbose (bool): If `true`, prints the progress of each epoch including metrics via `tqdm` else disables it 
+        
+        out_path (str, optional): Path to the folder where training metrics should be stored. If no path is given, nothing is stored. Defaults to `None`
+        
+        test_data (optional): Test data which can be used to compute statistics every `eval_every` epochs. It should be compatible with PyTorch `DataLoader`, e.g. this should be a `torch.utils.data.Dataset` or a numpy error / PyTorch tensor:
+        
+                test_loader = torch.utils.data.DataLoader(self.test_data, **self.loader_cfg)
+        
+            Defaults to `None`, which means no additional metrics are computed besides the one already obtained on the training data.
+        
+        loader (dict, optional): Dictionary of loader parameters which are passed to `torch.utils.data.DataLoader`:
+            
+                train_loader = torch.utils.data.DataLoader(
+                    data,
+                    **self.loader
+                ) 
+        
+            The loader is used for both, the training data and `test_data` if supplied. The loader can be `None` which defaults to:
+        
+                self.loader = {'num_workers': 1, 'pin_memory': True, 'batch_size':128} 
+        
+        eval_every (int, optional): Evaluates metrics on the test_data every `eval_every` epochs, if `test_data` is provided. Defaults to 5. If this is `None` no additonal metrics are computed.
+        
+        store_every (int, optional): Stores a checkpoint of the model every `store_every` epochs. If this is `None` no checkpoints are stored
+        
+        device (str, optional): The device which is used to execute the model. Should be compatible to PyTorch's keywords. Defaults to "cuda"
+        
+        use_amp (bool): If `true` uses mixed precision provided by PyTorch, else not.
+    """
     def __init__(self, 
                     optimizer, 
                     scheduler, 
@@ -173,15 +304,20 @@ class BaseModel(nn.Module):
             'cur_epoch': self.cur_epoch,
             'epochs': self.epochs, 
             'use_amp': self.use_amp, 
-            'state_dict': self.state_dict(),
-            'optimizer_state_dict': self.optimizer.state_dict(),
-            'scheduler_state_dict': None if not self.scheduler else self.scheduler.state_dict(),
             'scaler_state_dict': self.scaler.state_dict()
         }
 
     def store_checkpoint(self):
         state = self.get_state()
         torch.save(state, os.path.join(self.out_path, 'model_{}.tar'.format(self.cur_epoch)))
+
+    @abstractmethod
+    def forward(self, X):
+        pass
+
+    @abstractmethod
+    def prepare_backward(self, data, target, weights = None):
+        pass
 
     def fit(self, data):
         if not self.resume_from_checkpoint:
@@ -332,6 +468,21 @@ class BaseModel(nn.Module):
                 train_loader.dataset.end_of_epoch()
 
 class Ensemble(BaseModel):
+    """ Ensemble
+
+    This is an extension of the BaseModel specifically for ensembles. This class offers a `forward_with_base` function which returns all individual predictions as well as the combined predictions. 
+
+    Attributes:
+
+        combination_type (str, optional): The way individual predictions are combined. Defaults to `average`. Available are:
+
+            -  `average`: Uses $$ f(x) = \\frac{1}{M} \sum_{i=1}^M h^i(x) $$
+            -  `softmax`: Applies the softmax function to the average $$ f(x) = softmax(\\frac{1}{M} \sum_{i=1}^M h^i(x)) $$
+            -  `best`: Returns the most confident prediction across all models,  $$ f(x) = \arg\max_{i=1,\dots,M, j=1,\dots,C} \{h^i(x)_j\}$$
+        
+        n_estimators (int, optional): The number of estimators in the ensemble. Defaults to 5. Should be at-least 1.
+    """
+
     def __init__(self, n_estimators = 5, combination_type = "average", *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.combination_type = combination_type
@@ -373,6 +524,11 @@ class Ensemble(BaseModel):
         return pred_combined, base_preds
 
 class Model(BaseModel):
+    """ Model
+    
+    This is a single model which can be used to fit a single neural network. It serves as implementation for the BaseModel interface. Apart from that, nothing fancy is going on.
+    """
+    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.model = self.base_estimator()
