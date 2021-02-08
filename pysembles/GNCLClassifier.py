@@ -20,6 +20,7 @@ class GNCLClassifier(Ensemble):
     $$
     \frac{1}{N}\sum_{j=1}^N \left( \lambda \ell(f(x_j),y_j) + \frac{1-\lambda}{M}\sum_{i=1}^M \ell(h^i(x_j),y_j) \right)
     $$
+
     where \( \lambda \in [0,1] \) is the trade-off between the ensemble's performance and its diversity, 
 
     If you are interested in explicitly computing the diversity we currently supports three loss functions: MSE, Negative Log-Likelihood and CrossEntropy. Here 
@@ -27,6 +28,7 @@ class GNCLClassifier(Ensemble):
     $$
     \frac{1}{M} \sum_{i=1}^M \ell(h^i) - \frac{\lambda}{2M} \sum_{i=1}^M {d_i}^T D d_i
     $$
+    
     where $D = \nabla^2_{f(x)}\ell(f(x), y)$ and $d_i = (h^i(x) - f(x))$ is optimized. 
 
     The main reasons for this are twofold: First, we manually have to compute the hessian for every loss function which is a lot of work. Second, PyTorchs autograd functionality does not directly support a hessian (or even gradients) on a "per example" basis, but only summed over a batch. So far I have not found a way to use autograd efficiently here. 
