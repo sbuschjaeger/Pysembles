@@ -19,6 +19,11 @@ import torchvision.transforms as transforms
 
 from pysembles.models.BinarisedNeuralNetworks import binarize, BinaryTanh, BinaryLinear, BinaryConv2d, Scale
 
+'''
+Some common helper functions. 
+TODO: Add detailed documentation for each function and combine it with Metrics.py?
+'''
+
 # This function can be used as a scoring metric to score the number of parameters
 def pytorch_total_params(model):
     return sum(p.numel() for p in model.parameters())

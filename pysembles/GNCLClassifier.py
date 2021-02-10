@@ -13,23 +13,23 @@ from .Utils import TransformTensorDataset
 class GNCLClassifier(Ensemble):
     """(Generalized) Negative Correlation Learning.
 
-    Negative Correlation Learning uses the Bias-Variance-Co-Variance decomposition to derive a regularized objective function which enforces diversity among the ensemble members. The first appearance of this work was for the MSE loss in [1,2]. A modern application to the problem of crowd counting can be found in [4]. Optiz later proposed a similar loss using the Cross Entropy Loss, but without theoretical justifications [3]. Webb et al. in [5,6] gave more theoretical background to using the Cross Entropy Loss. Note that [6] is basically a shorter version of [5].
+    Negative Correlation Learning uses the Bias-Variance-Co-Variance decomposition to derive a regularized objective function which enforces diversity among the ensemble members. The first appearance of this work was for the MSE loss in [1,2]. A modern application to the problem of crowd counting can be found in [4]. Optiz later proposed a similar objective using the Cross Entropy Loss, but without theoretical justifications [3]. Webb et al. in [5,6] gave more theoretical background for using the Cross Entropy Loss. Note that [6] is basically a shorter version of [5].
 
-    We generalized and unified the previous works to include _any_ loss function using a second order Taylor approximation. As detailed in our paper, there is an upper bound for the GNCL objective which does not compute the exact diversity term. Thus, __any__ differentiable loss \( \ell \) function can be used for optimization. We will refer to this mode as `upper`. Let \( f(x) \) be the ensembles prediction consisting of M models \( h^1, \dots, h^M \), then 
+    We generalized and unified the previous works to include _any_ loss function using a second order Taylor approximation. As detailed in our paper, there is an upper bound for the GNCL objective which does not compute the exact diversity term. Thus, any differentiable loss \( \ell \) function can be used for optimization. We will refer to this mode as `upper`. Let \( f(x) \) be the ensembles prediction consisting of M models \( \{h^1, \dots, h^M\} \), then 
 
     $$
         \\frac{1}{N}\sum_{j=1}^N \lambda \ell(f(x_j),y_j) + \\frac{1-\lambda}{M}\sum_{i=1}^M \ell(h^i(x_j),y_j)
     $$
 
-    where \( \lambda \in [0,1] \) is the trade-off between the ensemble's performance and its diversity, 
+    where \( \lambda \in [0,1] \) is the trade-off between the ensemble's performance and its diversity.
 
-    If you are interested in explicitly computing the diversity we currently supports three loss functions: MSE, Negative Log-Likelihood and CrossEntropy. We call this mode `exact`:
+    If you are interested in explicitly computing the diversity we currently supports three loss functions: MSE, Negative Log-Likelihood and CrossEntropy. We call this mode `exact`. In this case the following objective is used:
     $$
         \\frac{1}{M} \sum_{i=1}^M \ell(h^i) - \\frac{\lambda}{2M} \sum_{i=1}^M {d_i}^T D d_i
     $$
     where \( D = \\nabla^2_{f(x)}\ell(f(x), y), d_i = (h^i(x) - f(x))\) is optimized.
 
-    The main reasons for this are twofold: First, we manually have to compute the hessian for every loss function which is a lot of work. Second, PyTorchs autograd functionality does not directly support a hessian (or even gradients) on a "per example" basis, but only summed over a batch. So far I have not found a way to use autograd efficiently here. 
+    Note that PyTorchs autograd functionality does not directly support a hessian (or even gradients) on a "per example" basis, but only summed over a batch. So far I have not found a way to use autograd efficiently here. Therefore, this mode is currently restricted to the three mentioned loss functions.
                 
     Attributes:
         n_estimators (int): Number of estimators in ensemble. Should be at least 1
@@ -39,7 +39,7 @@ class GNCLClassifier(Ensemble):
         mode (str): The mode used for fitting a new model. 
             
             - `mode != "exact"`: The upper bound is used for fitting. 
-            - `mode` == "exact"`: The diversity is explicity computed and used for fitting. Only MSE, Negative Log-Likelihood and CrossEntropy loss are supported
+            - `mode == "exact"`: The diversity is explicity computed and used for fitting. Only `nn.MSELoss`, `nn.NLLLoss`, `nn.CrossEntropyLoss` are supported.
 
     __References__
 

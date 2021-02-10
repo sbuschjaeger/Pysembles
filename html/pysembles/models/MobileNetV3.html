@@ -1,0 +1,1052 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+<meta name="generator" content="pdoc 0.9.2" />
+<title>pysembles.models.MobileNetV3 API documentation</title>
+<meta name="description" content="Copied this file form https://github.com/ShowLo/MobileNetV3/blob/master/mobileNetV3.py
+Props to ShowLo for the implementation." />
+<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
+<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
+<link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:30px;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:1em 0 .50em 0}h3{font-size:1.4em;margin:25px 0 10px 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .3s ease-in-out}a:hover{color:#e82}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900}pre code{background:#f8f8f8;font-size:.8em;line-height:1.4em}code{background:#f2f2f1;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{background:#f8f8f8;border:0;border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0;padding:1ex}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-weight:bold;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em .5em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.item .name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul{padding-left:1.5em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS_CHTML" integrity="sha256-kZafAc6mZvK3W3v1pHOcUix30OHQN6pU/NO2oFkqZVw=" crossorigin></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/highlight.min.js" integrity="sha256-Uv3H6lx7dJmRfRvH8TH6kJD1TSK1aFcwgx+mdg3epi8=" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => hljs.initHighlighting())</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>pysembles.models.MobileNetV3</code></h1>
+</header>
+<section id="section-intro">
+<p>Copied this file form <a href="https://github.com/ShowLo/MobileNetV3/blob/master/mobileNetV3.py">https://github.com/ShowLo/MobileNetV3/blob/master/mobileNetV3.py</a>
+Props to ShowLo for the implementation.</p>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python"># -*- coding: UTF-8 -*-
+
+&#39;&#39;&#39;
+Copied this file form https://github.com/ShowLo/MobileNetV3/blob/master/mobileNetV3.py
+Props to ShowLo for the implementation. 
+&#39;&#39;&#39;
+
+&#39;&#39;&#39;
+MobileNetV3 From &lt;Searching for MobileNetV3&gt;, arXiv:1905.02244.
+Ref: https://github.com/d-li14/mobilenetv3.pytorch/blob/master/mobilenetv3.py
+     https://github.com/kuan-wang/pytorch-mobilenet-v3/blob/master/mobilenetv3.py
+     
+&#39;&#39;&#39;
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import math
+from collections import OrderedDict
+
+
+def _ensure_divisible(number, divisor, min_value=None):
+    &#39;&#39;&#39;
+    Ensure that &#39;number&#39; can be &#39;divisor&#39; divisible
+    Reference from original tensorflow repo:
+    https://github.com/tensorflow/models/blob/master/research/slim/nets/mobilenet/mobilenet.py
+    &#39;&#39;&#39;
+    if min_value is None:
+        min_value = divisor
+    new_num = max(min_value, int(number + divisor / 2) // divisor * divisor)
+    if new_num &lt; 0.9 * number:
+        new_num += divisor
+    return new_num
+    
+class H_sigmoid(nn.Module):
+    &#39;&#39;&#39;
+    hard sigmoid
+    &#39;&#39;&#39;
+    def __init__(self, inplace=True):
+        super(H_sigmoid, self).__init__()
+        self.inplace = inplace
+
+    def forward(self, x):
+        return F.relu6(x + 3, inplace=self.inplace) / 6
+
+class H_swish(nn.Module):
+    &#39;&#39;&#39;
+    hard swish
+    &#39;&#39;&#39;
+    def __init__(self, inplace=True):
+        super(H_swish, self).__init__()
+        self.inplace = inplace
+
+    def forward(self, x):
+        return x * F.relu6(x + 3, inplace=self.inplace) / 6
+
+class SEModule(nn.Module):
+    &#39;&#39;&#39;
+    SE Module
+    Ref: https://github.com/moskomule/senet.pytorch/blob/master/senet/se_module.py
+    &#39;&#39;&#39;
+    def __init__(self, in_channels_num, reduction_ratio=4):
+        super(SEModule, self).__init__()
+
+        if in_channels_num % reduction_ratio != 0:
+            raise ValueError(&#39;in_channels_num must be divisible by reduction_ratio(default = 4)&#39;)
+
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(in_channels_num, in_channels_num // reduction_ratio, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(in_channels_num // reduction_ratio, in_channels_num, bias=False),
+            H_sigmoid()
+        )
+
+    def forward(self, x):
+        batch_size, channel_num, _, _ = x.size()
+        y = self.avg_pool(x).view(batch_size, channel_num)
+        y = self.fc(y).view(batch_size, channel_num, 1, 1)
+        return x * y
+
+class Bottleneck(nn.Module):
+    &#39;&#39;&#39;
+    The basic unit of MobileNetV3
+    &#39;&#39;&#39;
+    def __init__(self, in_channels_num, exp_size, out_channels_num, kernel_size, stride, use_SE, NL, BN_momentum):
+        &#39;&#39;&#39;
+        use_SE: True or False -- use SE Module or not
+        NL: nonlinearity, &#39;RE&#39; or &#39;HS&#39;
+        &#39;&#39;&#39;
+        super(Bottleneck, self).__init__()
+
+        assert stride in [1, 2]
+        NL = NL.upper()
+        assert NL in [&#39;RE&#39;, &#39;HS&#39;]
+        use_HS = NL == &#39;HS&#39;
+        
+        # Whether to use residual structure or not
+        self.use_residual = (stride == 1 and in_channels_num == out_channels_num)
+
+        if exp_size == in_channels_num:
+            # Without expansion, the first depthwise convolution is omitted
+            self.conv1 = nn.Sequential(
+                # Depthwise Convolution
+                nn.Conv2d(in_channels=in_channels_num, out_channels=exp_size, kernel_size=kernel_size, stride=stride, padding=(kernel_size-1)//2, groups=in_channels_num, bias=False),
+                nn.BatchNorm2d(num_features=exp_size, momentum=BN_momentum),
+                # SE Module
+                SEModule(exp_size) if use_SE else nn.Sequential(),
+                H_swish() if use_HS else nn.ReLU(inplace=True))
+            self.conv2 = nn.Sequential(
+                # Linear Pointwise Convolution
+                nn.Conv2d(in_channels=exp_size, out_channels=out_channels_num, kernel_size=1, stride=1, padding=0, bias=False),
+                #nn.BatchNorm2d(num_features=out_channels_num, momentum=BN_momentum)
+                nn.Sequential(OrderedDict([(&#39;lastBN&#39;, nn.BatchNorm2d(num_features=out_channels_num))])) if self.use_residual else
+                    nn.BatchNorm2d(num_features=out_channels_num, momentum=BN_momentum)
+            )
+        else:
+            # With expansion
+            self.conv1 = nn.Sequential(
+                # Pointwise Convolution for expansion
+                nn.Conv2d(in_channels=in_channels_num, out_channels=exp_size, kernel_size=1, stride=1, padding=0, bias=False),
+                nn.BatchNorm2d(num_features=exp_size, momentum=BN_momentum),
+                H_swish() if use_HS else nn.ReLU(inplace=True))
+            self.conv2 = nn.Sequential(
+                # Depthwise Convolution
+                nn.Conv2d(in_channels=exp_size, out_channels=exp_size, kernel_size=kernel_size, stride=stride, padding=(kernel_size-1)//2, groups=exp_size, bias=False),
+                nn.BatchNorm2d(num_features=exp_size, momentum=BN_momentum),
+                # SE Module
+                SEModule(exp_size) if use_SE else nn.Sequential(),
+                H_swish() if use_HS else nn.ReLU(inplace=True),
+                # Linear Pointwise Convolution
+                nn.Conv2d(in_channels=exp_size, out_channels=out_channels_num, kernel_size=1, stride=1, padding=0, bias=False),
+                #nn.BatchNorm2d(num_features=out_channels_num, momentum=BN_momentum)
+                nn.Sequential(OrderedDict([(&#39;lastBN&#39;, nn.BatchNorm2d(num_features=out_channels_num))])) if self.use_residual else
+                    nn.BatchNorm2d(num_features=out_channels_num, momentum=BN_momentum)
+            )
+
+    def forward(self, x, expand=False):
+        out1 = self.conv1(x)
+        out = self.conv2(out1)
+        if self.use_residual:
+            out = out + x
+        if expand:
+            return out, out1
+        else:
+            return out
+
+class MobileNetV3(nn.Module):
+    &#39;&#39;&#39;
+    
+    &#39;&#39;&#39;
+    def __init__(self, mode=&#39;small&#39;, classes_num=1000, input_size=224, width_multiplier=1.0, dropout=0.2, BN_momentum=0.1, zero_gamma=False, in_channels = 3):
+        &#39;&#39;&#39;
+        configs: setting of the model
+        mode: type of the model, &#39;large&#39; or &#39;small&#39;
+        &#39;&#39;&#39;
+        super(MobileNetV3, self).__init__()
+
+        mode = mode.lower()
+        assert mode in [&#39;large&#39;, &#39;small&#39;, &#39;tiny&#39;]
+        s = 2
+        if input_size == 32 or input_size == 56:
+            # using cifar-10, cifar-100 or Tiny-ImageNet
+            s = 1
+
+        # setting of the model
+        if mode == &#39;large&#39;:
+            # Configuration of a MobileNetV3-Large Model
+            configs = [
+                #kernel_size, exp_size, out_channels_num, use_SE, NL, stride
+                [3, 16, 16, False, &#39;RE&#39;, 1],
+                [3, 64, 24, False, &#39;RE&#39;, s],
+                [3, 72, 24, False, &#39;RE&#39;, 1],
+                [5, 72, 40, True, &#39;RE&#39;, 2],
+                [5, 120, 40, True, &#39;RE&#39;, 1],
+                [5, 120, 40, True, &#39;RE&#39;, 1],
+                [3, 240, 80, False, &#39;HS&#39;, 2],
+                [3, 200, 80, False, &#39;HS&#39;, 1],
+                [3, 184, 80, False, &#39;HS&#39;, 1],
+                [3, 184, 80, False, &#39;HS&#39;, 1],
+                [3, 480, 112, True, &#39;HS&#39;, 1],
+                [3, 672, 112, True, &#39;HS&#39;, 1],
+                [5, 672, 160, True, &#39;HS&#39;, 2],
+                [5, 960, 160, True, &#39;HS&#39;, 1],
+                [5, 960, 160, True, &#39;HS&#39;, 1]
+            ]
+        elif mode == &#39;small&#39;:
+            # Configuration of a MobileNetV3-Small Model
+            configs = [
+                #kernel_size, exp_size, out_channels_num, use_SE, NL, stride
+                [3, 16, 16, True, &#39;RE&#39;, s],
+                [3, 72, 24, False, &#39;RE&#39;, 2],
+                [3, 88, 24, False, &#39;RE&#39;, 1],
+                [5, 96, 40, True, &#39;HS&#39;, 2],
+                [5, 240, 40, True, &#39;HS&#39;, 1],
+                [5, 240, 40, True, &#39;HS&#39;, 1],
+                [5, 120, 48, True, &#39;HS&#39;, 1],
+                [5, 144, 48, True, &#39;HS&#39;, 1],
+                [5, 288, 96, True, &#39;HS&#39;, 2],
+                [5, 576, 96, True, &#39;HS&#39;, 1],
+                [5, 576, 96, True, &#39;HS&#39;, 1]
+            ]
+        elif mode == &#39;tiny&#39;:
+            # Configuration of a MobileNetV3-Tiny Model
+            # NOTE: BEWARE. This was not published. I - more or less - randomly removed
+            #       layers / reduced the overall size. 
+            configs = [
+                #kernel_size, exp_size, out_channels_num, use_SE, NL, stride
+                [3, 16, 16, True, &#39;RE&#39;, s],
+                [3, 72, 24, False, &#39;RE&#39;, 2],
+                [3, 88, 24, False, &#39;RE&#39;, 1],
+                [5, 96, 40, True, &#39;HS&#39;, 2],
+                [5, 120, 40, True, &#39;HS&#39;, 1],
+                [5, 120, 40, True, &#39;HS&#39;, 1],
+                [5, 60, 48, True, &#39;HS&#39;, 1],
+                [5, 72, 48, True, &#39;HS&#39;, 1],
+                # [5, 288, 96, True, &#39;HS&#39;, 2],
+                # [5, 576, 96, True, &#39;HS&#39;, 1],
+                # [5, 576, 96, True, &#39;HS&#39;, 1]
+            ]
+        first_channels_num = 16
+
+        #last_channels_num = 1280
+        # according to https://github.com/tensorflow/models/blob/master/research/slim/nets/mobilenet/mobilenet_v3.py
+        # if small -- 1024, if large -- 1280
+        if mode == &#34;large&#34;:
+            last_channels_num = 1280 
+        elif mode == &#34;small&#34;:
+            last_channels_num = 1024
+        else:
+            last_channels_num = 512 
+
+        divisor = 8
+
+        ########################################################################################################################
+        # feature extraction part
+        # input layer
+        input_channels_num = _ensure_divisible(first_channels_num * width_multiplier, divisor)
+        last_channels_num = _ensure_divisible(last_channels_num * width_multiplier, divisor) if width_multiplier &gt; 1 else last_channels_num
+        feature_extraction_layers = []
+        first_layer = nn.Sequential(
+            nn.Conv2d(in_channels=in_channels, out_channels=input_channels_num, kernel_size=3, stride=s, padding=1, bias=False),
+            nn.BatchNorm2d(num_features=input_channels_num, momentum=BN_momentum),
+            H_swish()
+        )
+        feature_extraction_layers.append(first_layer)
+        # Overlay of multiple bottleneck structures
+        for kernel_size, exp_size, out_channels_num, use_SE, NL, stride in configs:
+            output_channels_num = _ensure_divisible(out_channels_num * width_multiplier, divisor)
+            exp_size = _ensure_divisible(exp_size * width_multiplier, divisor)
+            feature_extraction_layers.append(Bottleneck(input_channels_num, exp_size, output_channels_num, kernel_size, stride, use_SE, NL, BN_momentum))
+            input_channels_num = output_channels_num
+        
+        # the last stage
+        last_stage_channels_num = _ensure_divisible(exp_size * width_multiplier, divisor)
+        last_stage_layer1 = nn.Sequential(
+                nn.Conv2d(in_channels=input_channels_num, out_channels=last_stage_channels_num, kernel_size=1, stride=1, padding=0, bias=False),
+                nn.BatchNorm2d(num_features=last_stage_channels_num, momentum=BN_momentum),
+                H_swish()
+            )
+        feature_extraction_layers.append(last_stage_layer1)
+
+        
+        self.featureList = nn.ModuleList(feature_extraction_layers)
+
+        # SE Module
+        # remove the last SE Module according to https://github.com/tensorflow/models/blob/master/research/slim/nets/mobilenet/mobilenet_v3.py
+        # feature_extraction_layers.append(SEModule(last_stage_channels_num) if mode == &#39;small&#39; else nn.Sequential())
+
+        last_stage = []
+        last_stage.append(nn.AdaptiveAvgPool2d(1))
+        last_stage.append(nn.Conv2d(in_channels=last_stage_channels_num, out_channels=last_channels_num, kernel_size=1, stride=1, padding=0, bias=False))
+        last_stage.append(H_swish())
+
+        self.last_stage_layers = nn.Sequential(*last_stage)
+        
+
+        ########################################################################################################################
+        # Classification part
+        
+        self.classifier = nn.Sequential(
+            nn.Dropout(p=dropout),
+            nn.Linear(last_channels_num, classes_num)
+        )
+        
+
+        &#39;&#39;&#39;
+        self.extras = nn.ModuleList([
+            InvertedResidual(576, 512, 2, 0.2),
+            InvertedResidual(512, 256, 2, 0.25),
+            InvertedResidual(256, 256, 2, 0.5),
+            InvertedResidual(256, 64, 2, 0.25)
+        ])
+        &#39;&#39;&#39;
+
+        ########################################################################################################################
+        # Initialize the weights
+        # self._initialize_weights(zero_gamma)
+
+    def forward(self, x):
+        for i in range(9):
+            x = self.featureList[i](x)
+        x = self.featureList[9](x)
+        for i in range(10, len(self.featureList)):
+            x = self.featureList[i](x)
+        x = self.last_stage_layers(x)
+        x = x.view(x.size(0), -1)
+        x = self.classifier(x)
+        return x
+
+    def _initialize_weights(self, zero_gamma):
+        &#39;&#39;&#39;
+        Initialize the weights
+        &#39;&#39;&#39;
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode=&#39;fan_out&#39;)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, std=0.001)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+        if zero_gamma:
+            for m in self.modules():
+                    if hasattr(m, &#39;lastBN&#39;):
+                        nn.init.constant_(m.lastBN.weight, 0.0)
+
+
+if __name__ == &#34;__main__&#34;:
+    width_multiplier = 1
+    from torchsummaryX import summary
+    
+    # cifar10
+    #model_large = MobileNetV3(mode=&#39;large&#39;, classes_num=10, input_size=32, width_multiplier=width_multiplier)
+    #model_large.eval()
+    &#39;&#39;&#39;
+    model_small = MobileNetV3(mode=&#39;small&#39;, classes_num=10, input_size=32, width_multiplier=width_multiplier)
+    model_small.eval()
+    summary(model_small, torch.zeros((1, 3, 32, 32)))
+    print(&#39;MobileNetV3-Small-%.2f cifar10-summaryX\n&#39; % width_multiplier)
+    &#39;&#39;&#39;
+    &#39;&#39;&#39;
+    # cifar100
+    model_large = MobileNetV3(mode=&#39;large&#39;, classes_num=100, input_size=32, width_multiplier=width_multiplier)
+    model_large.eval()
+    model_small = MobileNetV3(mode=&#39;small&#39;, classes_num=100, input_size=32, width_multiplier=width_multiplier)
+    model_small.eval()
+    
+    input = torch.randn(1, 3, 32, 32)
+    from thop import profile
+    FLOPs_large, params_large = profile(model_large, inputs=(input,))
+    FLOPs_small, params_small = profile(model_small, inputs=(input,))
+
+    print(&#39;\nOn cifar100 using thop&#39;)
+    print(&#39;MobileNetV3-Large-%.2f:&#39; % width_multiplier)
+    print(&#39;Total flops: %.4fM&#39; % (FLOPs_large/1000000.0))
+    print(&#39;Total params: %.4fM&#39; % (params_large/1000000.0))
+    print()
+    print(&#39;MobileNetV3-Small-%.2f:&#39; % width_multiplier)
+    print(&#39;Total flops: %.4fM&#39; % (FLOPs_small/1000000.0))
+    print(&#39;Total params: %.4fM&#39; % (params_small/1000000.0))
+    
+    summary(model_large, torch.zeros((1, 3, 32, 32)))
+    print(&#39;MobileNetV3-Large-%.2f cifar100-summaryX\n&#39; % width_multiplier)
+    summary(model_small, torch.zeros((1, 3, 32, 32)))
+    print(&#39;MobileNetV3-Small-%.2f cifar100-summaryX\n&#39; % width_multiplier)
+    
+    # ImageNet
+    model_large = MobileNetV3(mode=&#39;large&#39;, classes_num=1000, input_size=224, width_multiplier=width_multiplier)
+    model_large.eval()
+    model_small = MobileNetV3(mode=&#39;small&#39;, classes_num=1000, input_size=224, width_multiplier=width_multiplier)
+    model_small.eval()
+    
+    
+    input = torch.randn(1, 3, 224, 224)
+    from thop import profile
+    FLOPs_large, params_large = profile(model_large, inputs=(input,))
+    FLOPs_small, params_small = profile(model_small, inputs=(input,))
+
+    print(&#39;\nOn ImageNet using thop&#39;)
+    print(&#39;MobileNetV3-Large-%.2f:&#39; % width_multiplier)
+    print(&#39;Total flops: %.4fM&#39; % (FLOPs_large/1000000.0))
+    print(&#39;Total params: %.4fM&#39; % (params_large/1000000.0))
+    print()
+    print(&#39;MobileNetV3-Small-%.2f:&#39; % width_multiplier)
+    print(&#39;Total flops: %.4fM&#39; % (FLOPs_small/1000000.0))
+    print(&#39;Total params: %.4fM&#39; % (params_small/1000000.0))
+    &#39;&#39;&#39;
+    &#39;&#39;&#39;
+    summary(model_large, torch.zeros((1, 3, 224, 224)))
+    print(&#39;MobileNetV3-Large-%.2f ImageNet-summaryX\n&#39; % width_multiplier)
+    summary(model_small, torch.zeros((1, 3, 224, 224)))
+    print(&#39;MobileNetV3-Small-%.2f ImageNet-summaryX\n&#39; % width_multiplier)
+    &#39;&#39;&#39;</code></pre>
+</details>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="pysembles.models.MobileNetV3.Bottleneck"><code class="flex name class">
+<span>class <span class="ident">Bottleneck</span></span>
+<span>(</span><span>in_channels_num, exp_size, out_channels_num, kernel_size, stride, use_SE, NL, BN_momentum)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>The basic unit of MobileNetV3</p>
+<p>use_SE: True or False &ndash; use SE Module or not
+NL: nonlinearity, 'RE' or 'HS'</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class Bottleneck(nn.Module):
+    &#39;&#39;&#39;
+    The basic unit of MobileNetV3
+    &#39;&#39;&#39;
+    def __init__(self, in_channels_num, exp_size, out_channels_num, kernel_size, stride, use_SE, NL, BN_momentum):
+        &#39;&#39;&#39;
+        use_SE: True or False -- use SE Module or not
+        NL: nonlinearity, &#39;RE&#39; or &#39;HS&#39;
+        &#39;&#39;&#39;
+        super(Bottleneck, self).__init__()
+
+        assert stride in [1, 2]
+        NL = NL.upper()
+        assert NL in [&#39;RE&#39;, &#39;HS&#39;]
+        use_HS = NL == &#39;HS&#39;
+        
+        # Whether to use residual structure or not
+        self.use_residual = (stride == 1 and in_channels_num == out_channels_num)
+
+        if exp_size == in_channels_num:
+            # Without expansion, the first depthwise convolution is omitted
+            self.conv1 = nn.Sequential(
+                # Depthwise Convolution
+                nn.Conv2d(in_channels=in_channels_num, out_channels=exp_size, kernel_size=kernel_size, stride=stride, padding=(kernel_size-1)//2, groups=in_channels_num, bias=False),
+                nn.BatchNorm2d(num_features=exp_size, momentum=BN_momentum),
+                # SE Module
+                SEModule(exp_size) if use_SE else nn.Sequential(),
+                H_swish() if use_HS else nn.ReLU(inplace=True))
+            self.conv2 = nn.Sequential(
+                # Linear Pointwise Convolution
+                nn.Conv2d(in_channels=exp_size, out_channels=out_channels_num, kernel_size=1, stride=1, padding=0, bias=False),
+                #nn.BatchNorm2d(num_features=out_channels_num, momentum=BN_momentum)
+                nn.Sequential(OrderedDict([(&#39;lastBN&#39;, nn.BatchNorm2d(num_features=out_channels_num))])) if self.use_residual else
+                    nn.BatchNorm2d(num_features=out_channels_num, momentum=BN_momentum)
+            )
+        else:
+            # With expansion
+            self.conv1 = nn.Sequential(
+                # Pointwise Convolution for expansion
+                nn.Conv2d(in_channels=in_channels_num, out_channels=exp_size, kernel_size=1, stride=1, padding=0, bias=False),
+                nn.BatchNorm2d(num_features=exp_size, momentum=BN_momentum),
+                H_swish() if use_HS else nn.ReLU(inplace=True))
+            self.conv2 = nn.Sequential(
+                # Depthwise Convolution
+                nn.Conv2d(in_channels=exp_size, out_channels=exp_size, kernel_size=kernel_size, stride=stride, padding=(kernel_size-1)//2, groups=exp_size, bias=False),
+                nn.BatchNorm2d(num_features=exp_size, momentum=BN_momentum),
+                # SE Module
+                SEModule(exp_size) if use_SE else nn.Sequential(),
+                H_swish() if use_HS else nn.ReLU(inplace=True),
+                # Linear Pointwise Convolution
+                nn.Conv2d(in_channels=exp_size, out_channels=out_channels_num, kernel_size=1, stride=1, padding=0, bias=False),
+                #nn.BatchNorm2d(num_features=out_channels_num, momentum=BN_momentum)
+                nn.Sequential(OrderedDict([(&#39;lastBN&#39;, nn.BatchNorm2d(num_features=out_channels_num))])) if self.use_residual else
+                    nn.BatchNorm2d(num_features=out_channels_num, momentum=BN_momentum)
+            )
+
+    def forward(self, x, expand=False):
+        out1 = self.conv1(x)
+        out = self.conv2(out1)
+        if self.use_residual:
+            out = out + x
+        if expand:
+            return out, out1
+        else:
+            return out</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Class variables</h3>
+<dl>
+<dt id="pysembles.models.MobileNetV3.Bottleneck.dump_patches"><code class="name">var <span class="ident">dump_patches</span> : bool</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="pysembles.models.MobileNetV3.Bottleneck.training"><code class="name">var <span class="ident">training</span> : bool</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="pysembles.models.MobileNetV3.Bottleneck.forward"><code class="name flex">
+<span>def <span class="ident">forward</span></span>(<span>self, x, expand=False) ‑> Callable[..., Any]</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def forward(self, x, expand=False):
+    out1 = self.conv1(x)
+    out = self.conv2(out1)
+    if self.use_residual:
+        out = out + x
+    if expand:
+        return out, out1
+    else:
+        return out</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+<dt id="pysembles.models.MobileNetV3.H_sigmoid"><code class="flex name class">
+<span>class <span class="ident">H_sigmoid</span></span>
+<span>(</span><span>inplace=True)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>hard sigmoid</p>
+<p>Initializes internal Module state, shared by both nn.Module and ScriptModule.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class H_sigmoid(nn.Module):
+    &#39;&#39;&#39;
+    hard sigmoid
+    &#39;&#39;&#39;
+    def __init__(self, inplace=True):
+        super(H_sigmoid, self).__init__()
+        self.inplace = inplace
+
+    def forward(self, x):
+        return F.relu6(x + 3, inplace=self.inplace) / 6</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Class variables</h3>
+<dl>
+<dt id="pysembles.models.MobileNetV3.H_sigmoid.dump_patches"><code class="name">var <span class="ident">dump_patches</span> : bool</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="pysembles.models.MobileNetV3.H_sigmoid.training"><code class="name">var <span class="ident">training</span> : bool</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="pysembles.models.MobileNetV3.H_sigmoid.forward"><code class="name flex">
+<span>def <span class="ident">forward</span></span>(<span>self, x) ‑> Callable[..., Any]</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def forward(self, x):
+    return F.relu6(x + 3, inplace=self.inplace) / 6</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+<dt id="pysembles.models.MobileNetV3.H_swish"><code class="flex name class">
+<span>class <span class="ident">H_swish</span></span>
+<span>(</span><span>inplace=True)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>hard swish</p>
+<p>Initializes internal Module state, shared by both nn.Module and ScriptModule.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class H_swish(nn.Module):
+    &#39;&#39;&#39;
+    hard swish
+    &#39;&#39;&#39;
+    def __init__(self, inplace=True):
+        super(H_swish, self).__init__()
+        self.inplace = inplace
+
+    def forward(self, x):
+        return x * F.relu6(x + 3, inplace=self.inplace) / 6</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Class variables</h3>
+<dl>
+<dt id="pysembles.models.MobileNetV3.H_swish.dump_patches"><code class="name">var <span class="ident">dump_patches</span> : bool</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="pysembles.models.MobileNetV3.H_swish.training"><code class="name">var <span class="ident">training</span> : bool</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="pysembles.models.MobileNetV3.H_swish.forward"><code class="name flex">
+<span>def <span class="ident">forward</span></span>(<span>self, x) ‑> Callable[..., Any]</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def forward(self, x):
+    return x * F.relu6(x + 3, inplace=self.inplace) / 6</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+<dt id="pysembles.models.MobileNetV3.MobileNetV3"><code class="flex name class">
+<span>class <span class="ident">MobileNetV3</span></span>
+<span>(</span><span>mode='small', classes_num=1000, input_size=224, width_multiplier=1.0, dropout=0.2, BN_momentum=0.1, zero_gamma=False, in_channels=3)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>configs: setting of the model
+mode: type of the model, 'large' or 'small'</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class MobileNetV3(nn.Module):
+    &#39;&#39;&#39;
+    
+    &#39;&#39;&#39;
+    def __init__(self, mode=&#39;small&#39;, classes_num=1000, input_size=224, width_multiplier=1.0, dropout=0.2, BN_momentum=0.1, zero_gamma=False, in_channels = 3):
+        &#39;&#39;&#39;
+        configs: setting of the model
+        mode: type of the model, &#39;large&#39; or &#39;small&#39;
+        &#39;&#39;&#39;
+        super(MobileNetV3, self).__init__()
+
+        mode = mode.lower()
+        assert mode in [&#39;large&#39;, &#39;small&#39;, &#39;tiny&#39;]
+        s = 2
+        if input_size == 32 or input_size == 56:
+            # using cifar-10, cifar-100 or Tiny-ImageNet
+            s = 1
+
+        # setting of the model
+        if mode == &#39;large&#39;:
+            # Configuration of a MobileNetV3-Large Model
+            configs = [
+                #kernel_size, exp_size, out_channels_num, use_SE, NL, stride
+                [3, 16, 16, False, &#39;RE&#39;, 1],
+                [3, 64, 24, False, &#39;RE&#39;, s],
+                [3, 72, 24, False, &#39;RE&#39;, 1],
+                [5, 72, 40, True, &#39;RE&#39;, 2],
+                [5, 120, 40, True, &#39;RE&#39;, 1],
+                [5, 120, 40, True, &#39;RE&#39;, 1],
+                [3, 240, 80, False, &#39;HS&#39;, 2],
+                [3, 200, 80, False, &#39;HS&#39;, 1],
+                [3, 184, 80, False, &#39;HS&#39;, 1],
+                [3, 184, 80, False, &#39;HS&#39;, 1],
+                [3, 480, 112, True, &#39;HS&#39;, 1],
+                [3, 672, 112, True, &#39;HS&#39;, 1],
+                [5, 672, 160, True, &#39;HS&#39;, 2],
+                [5, 960, 160, True, &#39;HS&#39;, 1],
+                [5, 960, 160, True, &#39;HS&#39;, 1]
+            ]
+        elif mode == &#39;small&#39;:
+            # Configuration of a MobileNetV3-Small Model
+            configs = [
+                #kernel_size, exp_size, out_channels_num, use_SE, NL, stride
+                [3, 16, 16, True, &#39;RE&#39;, s],
+                [3, 72, 24, False, &#39;RE&#39;, 2],
+                [3, 88, 24, False, &#39;RE&#39;, 1],
+                [5, 96, 40, True, &#39;HS&#39;, 2],
+                [5, 240, 40, True, &#39;HS&#39;, 1],
+                [5, 240, 40, True, &#39;HS&#39;, 1],
+                [5, 120, 48, True, &#39;HS&#39;, 1],
+                [5, 144, 48, True, &#39;HS&#39;, 1],
+                [5, 288, 96, True, &#39;HS&#39;, 2],
+                [5, 576, 96, True, &#39;HS&#39;, 1],
+                [5, 576, 96, True, &#39;HS&#39;, 1]
+            ]
+        elif mode == &#39;tiny&#39;:
+            # Configuration of a MobileNetV3-Tiny Model
+            # NOTE: BEWARE. This was not published. I - more or less - randomly removed
+            #       layers / reduced the overall size. 
+            configs = [
+                #kernel_size, exp_size, out_channels_num, use_SE, NL, stride
+                [3, 16, 16, True, &#39;RE&#39;, s],
+                [3, 72, 24, False, &#39;RE&#39;, 2],
+                [3, 88, 24, False, &#39;RE&#39;, 1],
+                [5, 96, 40, True, &#39;HS&#39;, 2],
+                [5, 120, 40, True, &#39;HS&#39;, 1],
+                [5, 120, 40, True, &#39;HS&#39;, 1],
+                [5, 60, 48, True, &#39;HS&#39;, 1],
+                [5, 72, 48, True, &#39;HS&#39;, 1],
+                # [5, 288, 96, True, &#39;HS&#39;, 2],
+                # [5, 576, 96, True, &#39;HS&#39;, 1],
+                # [5, 576, 96, True, &#39;HS&#39;, 1]
+            ]
+        first_channels_num = 16
+
+        #last_channels_num = 1280
+        # according to https://github.com/tensorflow/models/blob/master/research/slim/nets/mobilenet/mobilenet_v3.py
+        # if small -- 1024, if large -- 1280
+        if mode == &#34;large&#34;:
+            last_channels_num = 1280 
+        elif mode == &#34;small&#34;:
+            last_channels_num = 1024
+        else:
+            last_channels_num = 512 
+
+        divisor = 8
+
+        ########################################################################################################################
+        # feature extraction part
+        # input layer
+        input_channels_num = _ensure_divisible(first_channels_num * width_multiplier, divisor)
+        last_channels_num = _ensure_divisible(last_channels_num * width_multiplier, divisor) if width_multiplier &gt; 1 else last_channels_num
+        feature_extraction_layers = []
+        first_layer = nn.Sequential(
+            nn.Conv2d(in_channels=in_channels, out_channels=input_channels_num, kernel_size=3, stride=s, padding=1, bias=False),
+            nn.BatchNorm2d(num_features=input_channels_num, momentum=BN_momentum),
+            H_swish()
+        )
+        feature_extraction_layers.append(first_layer)
+        # Overlay of multiple bottleneck structures
+        for kernel_size, exp_size, out_channels_num, use_SE, NL, stride in configs:
+            output_channels_num = _ensure_divisible(out_channels_num * width_multiplier, divisor)
+            exp_size = _ensure_divisible(exp_size * width_multiplier, divisor)
+            feature_extraction_layers.append(Bottleneck(input_channels_num, exp_size, output_channels_num, kernel_size, stride, use_SE, NL, BN_momentum))
+            input_channels_num = output_channels_num
+        
+        # the last stage
+        last_stage_channels_num = _ensure_divisible(exp_size * width_multiplier, divisor)
+        last_stage_layer1 = nn.Sequential(
+                nn.Conv2d(in_channels=input_channels_num, out_channels=last_stage_channels_num, kernel_size=1, stride=1, padding=0, bias=False),
+                nn.BatchNorm2d(num_features=last_stage_channels_num, momentum=BN_momentum),
+                H_swish()
+            )
+        feature_extraction_layers.append(last_stage_layer1)
+
+        
+        self.featureList = nn.ModuleList(feature_extraction_layers)
+
+        # SE Module
+        # remove the last SE Module according to https://github.com/tensorflow/models/blob/master/research/slim/nets/mobilenet/mobilenet_v3.py
+        # feature_extraction_layers.append(SEModule(last_stage_channels_num) if mode == &#39;small&#39; else nn.Sequential())
+
+        last_stage = []
+        last_stage.append(nn.AdaptiveAvgPool2d(1))
+        last_stage.append(nn.Conv2d(in_channels=last_stage_channels_num, out_channels=last_channels_num, kernel_size=1, stride=1, padding=0, bias=False))
+        last_stage.append(H_swish())
+
+        self.last_stage_layers = nn.Sequential(*last_stage)
+        
+
+        ########################################################################################################################
+        # Classification part
+        
+        self.classifier = nn.Sequential(
+            nn.Dropout(p=dropout),
+            nn.Linear(last_channels_num, classes_num)
+        )
+        
+
+        &#39;&#39;&#39;
+        self.extras = nn.ModuleList([
+            InvertedResidual(576, 512, 2, 0.2),
+            InvertedResidual(512, 256, 2, 0.25),
+            InvertedResidual(256, 256, 2, 0.5),
+            InvertedResidual(256, 64, 2, 0.25)
+        ])
+        &#39;&#39;&#39;
+
+        ########################################################################################################################
+        # Initialize the weights
+        # self._initialize_weights(zero_gamma)
+
+    def forward(self, x):
+        for i in range(9):
+            x = self.featureList[i](x)
+        x = self.featureList[9](x)
+        for i in range(10, len(self.featureList)):
+            x = self.featureList[i](x)
+        x = self.last_stage_layers(x)
+        x = x.view(x.size(0), -1)
+        x = self.classifier(x)
+        return x
+
+    def _initialize_weights(self, zero_gamma):
+        &#39;&#39;&#39;
+        Initialize the weights
+        &#39;&#39;&#39;
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode=&#39;fan_out&#39;)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, std=0.001)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+        if zero_gamma:
+            for m in self.modules():
+                    if hasattr(m, &#39;lastBN&#39;):
+                        nn.init.constant_(m.lastBN.weight, 0.0)</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Class variables</h3>
+<dl>
+<dt id="pysembles.models.MobileNetV3.MobileNetV3.dump_patches"><code class="name">var <span class="ident">dump_patches</span> : bool</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="pysembles.models.MobileNetV3.MobileNetV3.training"><code class="name">var <span class="ident">training</span> : bool</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
+<h3>Instance variables</h3>
+<dl>
+<dt id="pysembles.models.MobileNetV3.MobileNetV3.classifier"><code class="name">var <span class="ident">classifier</span></code></dt>
+<dd>
+<div class="desc"><p>self.extras = nn.ModuleList([
+InvertedResidual(576, 512, 2, 0.2),
+InvertedResidual(512, 256, 2, 0.25),
+InvertedResidual(256, 256, 2, 0.5),
+InvertedResidual(256, 64, 2, 0.25)
+])</p></div>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="pysembles.models.MobileNetV3.MobileNetV3.forward"><code class="name flex">
+<span>def <span class="ident">forward</span></span>(<span>self, x) ‑> Callable[..., Any]</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def forward(self, x):
+    for i in range(9):
+        x = self.featureList[i](x)
+    x = self.featureList[9](x)
+    for i in range(10, len(self.featureList)):
+        x = self.featureList[i](x)
+    x = self.last_stage_layers(x)
+    x = x.view(x.size(0), -1)
+    x = self.classifier(x)
+    return x</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+<dt id="pysembles.models.MobileNetV3.SEModule"><code class="flex name class">
+<span>class <span class="ident">SEModule</span></span>
+<span>(</span><span>in_channels_num, reduction_ratio=4)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>SE Module
+Ref: <a href="https://github.com/moskomule/senet.pytorch/blob/master/senet/se_module.py">https://github.com/moskomule/senet.pytorch/blob/master/senet/se_module.py</a></p>
+<p>Initializes internal Module state, shared by both nn.Module and ScriptModule.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class SEModule(nn.Module):
+    &#39;&#39;&#39;
+    SE Module
+    Ref: https://github.com/moskomule/senet.pytorch/blob/master/senet/se_module.py
+    &#39;&#39;&#39;
+    def __init__(self, in_channels_num, reduction_ratio=4):
+        super(SEModule, self).__init__()
+
+        if in_channels_num % reduction_ratio != 0:
+            raise ValueError(&#39;in_channels_num must be divisible by reduction_ratio(default = 4)&#39;)
+
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(in_channels_num, in_channels_num // reduction_ratio, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(in_channels_num // reduction_ratio, in_channels_num, bias=False),
+            H_sigmoid()
+        )
+
+    def forward(self, x):
+        batch_size, channel_num, _, _ = x.size()
+        y = self.avg_pool(x).view(batch_size, channel_num)
+        y = self.fc(y).view(batch_size, channel_num, 1, 1)
+        return x * y</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Class variables</h3>
+<dl>
+<dt id="pysembles.models.MobileNetV3.SEModule.dump_patches"><code class="name">var <span class="ident">dump_patches</span> : bool</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="pysembles.models.MobileNetV3.SEModule.training"><code class="name">var <span class="ident">training</span> : bool</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="pysembles.models.MobileNetV3.SEModule.forward"><code class="name flex">
+<span>def <span class="ident">forward</span></span>(<span>self, x) ‑> Callable[..., Any]</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def forward(self, x):
+    batch_size, channel_num, _, _ = x.size()
+    y = self.avg_pool(x).view(batch_size, channel_num)
+    y = self.fc(y).view(batch_size, channel_num, 1, 1)
+    return x * y</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<h1>Index</h1>
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="pysembles.models" href="index.html">pysembles.models</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="pysembles.models.MobileNetV3.Bottleneck" href="#pysembles.models.MobileNetV3.Bottleneck">Bottleneck</a></code></h4>
+<ul class="">
+<li><code><a title="pysembles.models.MobileNetV3.Bottleneck.dump_patches" href="#pysembles.models.MobileNetV3.Bottleneck.dump_patches">dump_patches</a></code></li>
+<li><code><a title="pysembles.models.MobileNetV3.Bottleneck.forward" href="#pysembles.models.MobileNetV3.Bottleneck.forward">forward</a></code></li>
+<li><code><a title="pysembles.models.MobileNetV3.Bottleneck.training" href="#pysembles.models.MobileNetV3.Bottleneck.training">training</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="pysembles.models.MobileNetV3.H_sigmoid" href="#pysembles.models.MobileNetV3.H_sigmoid">H_sigmoid</a></code></h4>
+<ul class="">
+<li><code><a title="pysembles.models.MobileNetV3.H_sigmoid.dump_patches" href="#pysembles.models.MobileNetV3.H_sigmoid.dump_patches">dump_patches</a></code></li>
+<li><code><a title="pysembles.models.MobileNetV3.H_sigmoid.forward" href="#pysembles.models.MobileNetV3.H_sigmoid.forward">forward</a></code></li>
+<li><code><a title="pysembles.models.MobileNetV3.H_sigmoid.training" href="#pysembles.models.MobileNetV3.H_sigmoid.training">training</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="pysembles.models.MobileNetV3.H_swish" href="#pysembles.models.MobileNetV3.H_swish">H_swish</a></code></h4>
+<ul class="">
+<li><code><a title="pysembles.models.MobileNetV3.H_swish.dump_patches" href="#pysembles.models.MobileNetV3.H_swish.dump_patches">dump_patches</a></code></li>
+<li><code><a title="pysembles.models.MobileNetV3.H_swish.forward" href="#pysembles.models.MobileNetV3.H_swish.forward">forward</a></code></li>
+<li><code><a title="pysembles.models.MobileNetV3.H_swish.training" href="#pysembles.models.MobileNetV3.H_swish.training">training</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="pysembles.models.MobileNetV3.MobileNetV3" href="#pysembles.models.MobileNetV3.MobileNetV3">MobileNetV3</a></code></h4>
+<ul class="">
+<li><code><a title="pysembles.models.MobileNetV3.MobileNetV3.classifier" href="#pysembles.models.MobileNetV3.MobileNetV3.classifier">classifier</a></code></li>
+<li><code><a title="pysembles.models.MobileNetV3.MobileNetV3.dump_patches" href="#pysembles.models.MobileNetV3.MobileNetV3.dump_patches">dump_patches</a></code></li>
+<li><code><a title="pysembles.models.MobileNetV3.MobileNetV3.forward" href="#pysembles.models.MobileNetV3.MobileNetV3.forward">forward</a></code></li>
+<li><code><a title="pysembles.models.MobileNetV3.MobileNetV3.training" href="#pysembles.models.MobileNetV3.MobileNetV3.training">training</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="pysembles.models.MobileNetV3.SEModule" href="#pysembles.models.MobileNetV3.SEModule">SEModule</a></code></h4>
+<ul class="">
+<li><code><a title="pysembles.models.MobileNetV3.SEModule.dump_patches" href="#pysembles.models.MobileNetV3.SEModule.dump_patches">dump_patches</a></code></li>
+<li><code><a title="pysembles.models.MobileNetV3.SEModule.forward" href="#pysembles.models.MobileNetV3.SEModule.forward">forward</a></code></li>
+<li><code><a title="pysembles.models.MobileNetV3.SEModule.training" href="#pysembles.models.MobileNetV3.SEModule.training">training</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc"><cite>pdoc</cite> 0.9.2</a>.</p>
+</footer>
+</body>
+</html>

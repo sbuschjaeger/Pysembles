@@ -23,10 +23,14 @@ class SnapshotEnsembleClassifier(Ensemble):
     """ SnapshotEnsembleClassifier.
 
     Snapshot ensembles are ensembles which take snapshots of the current model during optimization and stores it. During prediction _all_ models provide a prediction and the average is returned. This way, a diverse ensemble is built on-the-fly while training a single model [1,2]. Snapshot ensembles formally belong to the class of pseudo-ensembles [3]. Pseudo-ensembles are ensembles that are derived from a large single network by perturbing it with a noise process. They minimize the following objective
+
     $$
-    \\frac{1}{N}\sum_{j=1}^N \E{\theta}{\ell_{\theta}(\mu(x_i),y_i)} + \lambda \E{\theta}{Z\left(\mu(x_i), \mu_{\theta}(x_i)\right)}
+    \\frac{1}{N}\sum_{j=1}^N \mathbb E_{\\theta} [ \ell_{\\theta}(\mu(x_i),y_i) ] + \lambda \mathbb E_{\\theta} [Z(\mu(x_i), \mu_{\\theta}(x_i))]
     $$
-    where \(\mu\) denotes the `mother' net, \( \mu_{\theta} \) is a child net under the noise process \(\theta, \ell\) is a loss function and \(Z\) is a regularizer with regularization strength \(\lambda\). As an interestring sidenote, Dropout also belongs to this class. 
+
+    
+
+    where \(\mu\) denotes the `mother' net, \( \mu_{\\theta} \) is a child net under the noise process \(\\theta, \ell\) is a loss function and \(Z\) is a regularizer with regularization strength \(\lambda\). As an interestring sidenote, Dropout also belongs to this class. 
 
     This implementation accepts a list of epochs (starting by 0) and takes a snapshot of the current model at the beginning of the provided epoch. For example, if you supply the 0 you will store the random initialization of the model, before any training happend. If you train your model for a shorter period than provided, then no snapshots are taken. 
 
@@ -34,12 +38,12 @@ class SnapshotEnsembleClassifier(Ensemble):
         list_of_snapshots (list of int): A list of epochs at which the snapshots should be taken. Snapshots are taken at the beginning of each epoch.
 
     __References__
+    
+    [1] Hu, H., Sun, W., Venkatraman, A., Hebert, M., & Bagnell, J. A. (2017). Gradient Boosting on Stochastic Data Streams, 54. Retrieved from https://arxiv.org/pdf/1703.00377.pdf
 
-        [1] Hu, H., Sun, W., Venkatraman, A., Hebert, M., & Bagnell, J. A. (2017). Gradient Boosting on Stochastic Data Streams, 54. Retrieved from https://arxiv.org/pdf/1703.00377.pdf
+    [2] Huang, G., Li, Y., Pleiss, G., Liu, Z., Hopcroft, J. E., & Weinberger, K. Q. (2017). Snapshot ensembles: Train 1, get M for free. 5th International Conference on Learning Representations, ICLR 2017 - Conference Track Proceedings, 1–14. Retrieved from https://arxiv.org/pdf/1704.00109.pdf
 
-        [2] Huang, G., Li, Y., Pleiss, G., Liu, Z., Hopcroft, J. E., & Weinberger, K. Q. (2017). Snapshot ensembles: Train 1, get M for free. 5th International Conference on Learning Representations, ICLR 2017 - Conference Track Proceedings, 1–14. Retrieved from https://arxiv.org/pdf/1704.00109.pdf
-
-        [3] Bachman, P., Alsharif, O., & Precup, D. (2014). Learning with pseudo-ensembles. In Advances in Neural Information Processing Systems.
+    [3] Bachman, P., Alsharif, O., & Precup, D. (2014). Learning with pseudo-ensembles. In Advances in Neural Information Processing Systems.
     """
     def __init__(self, list_of_snapshots, *args, **kwargs):
         super().__init__(*args, **kwargs)

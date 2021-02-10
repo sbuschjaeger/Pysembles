@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Copied  from https://github.com/Akashmathwani/Binarized-Neural-networks-using-pytorch/tree/master/MNIST%20using%20Binarized%20weights
+Originally this file way copied  form https://github.com/Akashmathwani/Binarized-Neural-networks-using-pytorch/tree/master/MNIST%20using%20Binarized%20weights
+Since then a few changes as well as a custom CUDA kernel found its way in here. 
 """
 
 import math
@@ -13,6 +14,9 @@ from torch.nn.modules.utils import _pair, _quadruple
 
 import binarization
 
+# TODO Add detailed docs. 
+
+# Use this code if you want to use CUDA binarization
 def binarize_to_plusminus1(input):
     input_shape = list(input.shape)
     len_input_shape = len(input_shape)
@@ -51,6 +55,7 @@ class BinarizeF(Function):
 # aliases
 binarize = BinarizeF.apply
 
+# Use this code if you want to use Python-only binarization
 # class BinarizeF(Function):
 #     @staticmethod
 #     def forward(ctx, input):

@@ -20,9 +20,10 @@ from .Models import Ensemble
 
 class GradientBoostedNets(Ensemble):
     ''' (Stochastic) Gradient Boosting for Neural Networks
-    Gradient Boosting sequentially trains a classifier on the residuals of the ensemble. In its most basic form this is usually a stagewise process in which a new classifier is trained in each stage / round [1]. Related Boosting algorithms like AdaBoost can also be viewed in this framework [2,3]. In order to speed-up the training process, Stochastic Gradient boosting [4] has been proposed. Stochastic Gradient Boosting trains the individual classifiers in each round on a random sample of the entire dataset. This implementation is a variation of this process and combines it with Stochastic Gradient Descent. The basic idea is to freeze the weights of individual models \( h^1,\dots, h^{i-1} \) and perform SGD on the i-th model's parameter using \( \ell(\\frac{1}{M}\sum_{j=1}^i h^j(x), y) \). This process is repeated for each model.
 
-    As far as I know this specific training has not been discussed in literature so far, but there is some significant overlap with exsiting work. See e.g. [5] and references therein. 
+    Gradient Boosting sequentially trains a classifier on the residuals of the ensemble. In its most basic form this is usually a stagewise process in which a new classifier is trained in each stage / round [1] on the errors of the entire model. Related Boosting algorithms like AdaBoost can also be viewed in this framework [2,3]. In order to speed-up the training process, Stochastic Gradient boosting [4] has been proposed. Stochastic Gradient Boosting trains the individual classifiers in each round on a random sample of the entire dataset. 
+    
+    This implementation is a variation of Stochastic Gradient Boosting and combines it with Stochastic Gradient Descent. The basic idea is to freeze the weights of individual models \( h^1,\dots, h^{i-1} \) and perform SGD on the i-th model's parameter using \( \ell(\\frac{1}{M}\sum_{j=1}^i h^j(x), y) \). This process is repeated for each model. As far as I know this specific training has not been discussed in literature so far, but there is some overlap with exsiting work. See e.g. [5] and references therein. 
 
     __References__
 

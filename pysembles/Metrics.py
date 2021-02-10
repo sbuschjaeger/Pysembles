@@ -13,6 +13,11 @@ from sklearn.metrics import make_scorer, accuracy_score
 
 from pysembles.Utils import TransformTensorDataset
 
+'''
+Some common metrics and helper functions. 
+TODO: Add detailed documentation for each function
+'''
+
 def diversity(model, data_loader):
     if not hasattr(model, "estimators_"):
         return 0

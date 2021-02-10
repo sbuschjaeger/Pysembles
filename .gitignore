@@ -6,3 +6,5 @@ build/temp.linux-x86_64-3.7/deep_ensembles_v2/cuda/binarization/binarization.o
 build/temp.linux-x86_64-3.7/deep_ensembles_v2/cuda/binarization/binarize_cuda.o
 build/*
 binarization.cpython-37m-x86_64-linux-gnu_10.2.so
+binarization.cpython-37m-x86_64-linux-gnu_11.0.so
+*.zip

@@ -23,40 +23,40 @@ from .Utils import store_model, TransformTensorDataset, apply_in_batches
 class BaseModel(nn.Module):
     """ BaseModel
 
-    This is the BaseModel used by all classifiers in this package. This Base class provides a basic loop for fitting on a dataset and some convenience functions for storing and loading chckpoints. Each classifier is expected to provide 
+    This is the BaseModel used by all classifiers in this package. This base class provides a basic loop for fitting on a dataset and some convenience functions for storing and loading chckpoints. Each classifier is expected to provide 
 
-    - `def forward(self, X)` A fordward method which predicts / applies the model to the given batch X. Since a BaseModel inherits from nn.Module please use `self.train` distinguish between training and testing mode of a model. 
+    - `def forward(self, X)`: A forward method which predicts / applies the model to the given batch `X`. Since a BaseModel inherits from `nn.Module` please use `self.train` to distinguish between training and testing. 
 
-    - `def prepare_backward(self, data, target, weights = None)` A method which computes the loss for calling backward as well as additional statistics, such as running accuracy. 
+    - `def prepare_backward(self, data, target, weights = None)`: A method which computes the loss for calling backward as well as additional statistics, such as running accuracy. The arguments are:
 
-        - `data`: This is the current data batch 
+        - `data`: The examples in this batch
         - `target`: This is the corresponding target batch 
         - `weights`: This is the corresponding weights per example if required. 
     
-        This repare_backward function should return a dictionary with three fields `prediction`, `backward` and `metrics`. The `prediction` field stores the individual predictions for the batch (in the same order). On the `backward` field PyTorch's backward is calld: 
-
+        The `prepare_backward` function should return a dictionary with three fields `prediction`, `backward` and `metrics`. The `prediction` field stores the individual predictions for the batch (in the same order). The `backward` field is used to perform the gradient step and `metrics` is used to store any metrics which should be written reported. Formally, the following `backward` call is used:
+        
             backward = self.prepare_backward(data, target, weights)
             loss = backward["backward"].mean()
             loss.backward()
+        
+        Note that the prediction / loss / metrics should be given for each individual example in the batch. __Do not reduce / sum / mean the loss etc manually__. This happens automatically later on. An example would be:
 
-        The `metrics` field is used to store / print metrics. Note that the prediction / loss / metrics should be given for each individual example in the batch. __Do not reduce / sum / mean the loss etc manually__. This happens automatically later on. For exampke:
+            d = {
+                # apply the model
+                "prediction" : self(data),  
 
-        d = {
-            # apply the model
-            "prediction" : self(data),  
+                # compute the loss
+                "backward" : self.loss_function(self(data), target), 
 
-            # compute the loss
-            "backward" : self.loss_function(self(data), target), 
+                # Compute some metrics
+                "metrics" :
+                {
+                    "loss" : self.loss_function(self(data), target).detach(), 
+                    "accuracy" : 100.0*(self(data).argmax(1) == target).type(self.get_float_type()) 
+                } 
+            }
 
-            # Compute some metrics
-            "metrics" :
-            {
-                "loss" : self.loss_function(self(data), target).detach(), 
-                "accuracy" : 100.0*(self(data).argmax(1) == target).type(self.get_float_type()) 
-            } 
-        }
-
-    In addition, for storing and loading of checkpoints the implementing class must take care of its parameters / object. To do so it should override `restore_state` and `get_state` for loading and storing respectively. Note that thse function __must__ call the respective functions frm the base class:
+    The bas class also supports storing and loading of checkpoints. To do so, the implementing class must take care of its parameters / object by overriding  `restore_state` and `get_state`. Note that thse function __must__ call the respective functions frm the base class:
 
         def restore_state(self,checkpoint):
             # Restore base state
@@ -74,7 +74,7 @@ class BaseModel(nn.Module):
                 "my_param":self.my_param
             } 
         
-    This class already expects a fair amount of parameters. Thus, it is best to use `args` and `kwargs` to pass parameters down to this class. The following pattern is used as a best-practice to implement new classifier:
+    This class already expects a fair amount of parameters. Thus, it is best to use `args` and `kwargs` to pass parameters between c'tors. The following pattern is used as a best-practice to implement new classifier:
 
         class MyClass(Model): 
             def __init__(self, my_param, *args, **kwargs):

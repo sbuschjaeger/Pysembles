@@ -25,13 +25,12 @@ class StackingClassifier(Model, Ensemble):
 
     Attributes:
         classifier (function): Generates and returns a new classifier. Please make sure, that it accepts the stacked input. 
-            The dimension of the input will likely change with different n_estimators. 
 
     __References__
     
-        [1] Wolpert, D. (1992). Stacked Generalization ( Stacking ). Neural Networks.
-        
-        [2] Breiman, L. (1996). Stacked regressions. Machine Learning. https://doi.org/10.1007/bf00117832
+    [1] Wolpert, D. (1992). Stacked Generalization ( Stacking ). Neural Networks.
+    
+    [2] Breiman, L. (1996). Stacked regressions. Machine Learning. https://doi.org/10.1007/bf00117832
     """
     def __init__(self, classifier, *args, **kwargs):
         super().__init__(*args, **kwargs)

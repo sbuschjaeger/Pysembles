@@ -20,6 +20,32 @@ from .Utils import TransformTensorDataset
 from .Models import Model
 
 class DeepDecisionTreeClassifier(Model):
+    '''
+    A soft decision tree classifier implementation via Neural Networks. *NOTE*: This implementation is not really maintained at the moment. 
+    The main idea is to train a soft dt classifier in an end-to-end fashion. To do so, the DT architecture must be given beforehand. This implementation uses balanced trees of depth \( d \). On each level there are 2^d nodes and each node has 2 children except for leaf nodes. The formal prediction function is
+
+    $$
+    f(x) = \sum_{l \in L} g_l(x) \prod_{i \in \mathcal P(l)} s_i(x)
+    $$
+    where \( L \) is the set of leaves, \( \mathcal P(l) \) denotes the path from the root node to the leaf node \( l \), \( s_i \) are the corresponding prediction functions for each split and \( g_l \) is the prediction function of the leaf. Formally we define these functions as:
+
+    - \( s_i \colon \mathcal X \mapsto [0,1] \), where \( \mathcal X \) is the domain of the input data. Conceptually, \(s_i(x) \\rightarrow 0 \) means that the examples belongs to the left child, whereas \(s_i(x) \\rightarrow 1 \) means it belongs to the right child. Note that regular DTs use axis-aligned splits with \(s_i(x) \in \\{0,1\\} \). 
+    - \( g_l \colon \mathcal X \mapsto \mathbb R^C \), where \(\mathcal X\) is the domain of the input data and \( C \) is the number of classes
+
+    Attributes:
+        split_estimator (function): A function that returns a new split estimator. Make sure that the output of the newly created estimators is between 0 and 1 (e.g. by using a nn.Sigmoid).
+
+        leaf_estimator (function): A function that returns a new leaf estimator.
+
+        depth (int): The maximum depth of this DT. A depth of 0 means that we only 1 leaf estimator is trained.
+
+        soft (bool, optional): True if the original split values between 0 and 1 should be retained. If false, these values are mapped ot 0 or 1, via \( 1\{s_i(x) \ge 0.5 \}\). Defaults to False.
+
+
+    __References__:
+        TODO
+
+    '''
     def __init__(self, split_estimator, leaf_estimator, depth, soft=False, *args, **kwargs):
         super().__init__(base_estimator = lambda: None, *args, **kwargs)
         
