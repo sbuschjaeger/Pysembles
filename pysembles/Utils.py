@@ -234,7 +234,7 @@ class Clippy(torch.optim.Adam):
         loss = super(Clippy, self).step(closure=closure)
         for group in self.param_groups:
             for p in group['params']:
-                p.data.clamp(-1,1)
+                p.data.clamp_(-1,1)
             
         return loss
 
